@@ -2,9 +2,6 @@ import airsim
 import cv2
 import numpy as np
 import os
-import pprint
-import setup_path 
-import tempfile
 
 # Use below in settings.json with Blocks environment
 """
@@ -34,25 +31,17 @@ client.confirmConnection()
 client.enableApiControl(True, "Drone1")
 client.enableApiControl(True, "Drone2")
 client.enableApiControl(True, "Drone3")
-client.enableApiControl(True, "Drone4")
-client.enableApiControl(True, "Drone5")
 client.armDisarm(True, "Drone1")
 client.armDisarm(True, "Drone2")
 client.armDisarm(True, "Drone3")
-client.armDisarm(True, "Drone4")
-client.armDisarm(True, "Drone5")
 
 airsim.wait_key('Press any key to takeoff')
 f1 = client.takeoffAsync(vehicle_name="Drone1")
 f2 = client.takeoffAsync(vehicle_name="Drone2")
 f3 = client.takeoffAsync(vehicle_name="Drone3")
-f4 = client.takeoffAsync(vehicle_name="Drone4")
-f5 = client.takeoffAsync(vehicle_name="Drone5")
 f1.join()
 f2.join()
 f3.join()
-f4.join()
-f5.join()
 
 state1 = client.getMultirotorState(vehicle_name="Drone1")
 # s = pprint.pformat(state1)
@@ -66,13 +55,9 @@ airsim.wait_key('Press any key to move vehicles')
 f1 = client.moveToPositionAsync(50, -2, 0, 5, vehicle_name="Drone1")
 f2 = client.moveToPositionAsync(50, 2, 0, 5, vehicle_name="Drone2")
 f3 = client.moveToPositionAsync(50, 0, 0, 5, vehicle_name="Drone3")
-f4 = client.moveToPositionAsync(50, -1, 2, 5, vehicle_name="Drone4")
-f5 = client.moveToPositionAsync(50, 1, 0, 5, vehicle_name="Drone5")
 f1.join()
 f2.join()
 f3.join()
-f4.join()
-f5.join()
 
 # airsim.wait_key('Press any key to take images')
 # # get camera images from the car
@@ -114,15 +99,10 @@ airsim.wait_key('Press any key to reset to original state')
 client.armDisarm(False, "Drone1")
 client.armDisarm(False, "Drone2")
 client.armDisarm(False, "Drone3")
-client.armDisarm(False, "Drone4")
-client.armDisarm(False, "Drone5")
 client.reset()
 
 # that's enough fun for now. let's quit cleanly
 client.enableApiControl(False, "Drone1")
 client.enableApiControl(False, "Drone2")
 client.enableApiControl(False, "Drone3")
-client.enableApiControl(False, "Drone4")
-client.enableApiControl(False, "Drone5")
-
 
