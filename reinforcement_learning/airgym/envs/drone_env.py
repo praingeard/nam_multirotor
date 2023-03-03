@@ -44,7 +44,7 @@ class AirSimDroneEnv(AirSimEnv):
         # self.drone.moveToPositionAsync(-0.55265, -31.9786, -19.0225, 10).join()
         # self.drone.moveByVelocityAsync(1, -0.67, -0.8, 5).join()
         self.drone.moveToPositionAsync(0, 0, -3, 10).join()
-        self.drone.moveByVelocityAsync(10, 0, 0, 1).join()
+        #self.drone.moveByVelocityAsync(10, 0, 0, 1).join()
 
     def transform_obs(self, responses):
         img1d = np.array(responses[0].image_data_float, dtype=float)
@@ -88,7 +88,7 @@ class AirSimDroneEnv(AirSimEnv):
 
         z = -10
         pts = [
-            np.array([50, 0, -10])
+            np.array([50, 0, -3])
             # np.array([-0.55265, -31.9786, -19.0225]),
             # np.array([48.59735, -63.3286, -60.07256]),
             # np.array([193.5974, -55.0786, -46.32256]),

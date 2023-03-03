@@ -163,7 +163,7 @@ while(timestep <= timestep_max):
 		drone_commands.append(f1)
 	rx_leader, ry_leader, rz_leader = get_leader_state(0)
 	#f_leader = client.moveByMotorPWMsAsync(0.61, 0.61, 0.61, 0.61, timestep_rate/2, vehicle_name="Leader")
-	f_leader = client.moveByRollPitchYawZAsync(-0.1, -0.1, 0, rz_leader[0], timestep_rate/2, vehicle_name="Leader")
+	f_leader = client.moveByRollPitchYawZAsync(0.0, 0.1, 0, rz_leader[0]-0.2, timestep_rate/2, vehicle_name="Leader")
 	#drone_commands.append(f_leader)
 	for f in drone_commands:
 		f.join()
