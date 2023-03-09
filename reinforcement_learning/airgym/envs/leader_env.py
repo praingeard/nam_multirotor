@@ -1,14 +1,16 @@
-import setup_path
 import airsim
 import numpy as np
 import math
-import time
-from argparse import ArgumentParser
 
-import gym
 from gym import spaces
 from airgym.envs.airsim_env import AirSimEnv
 
+import signal
+import os
+import datetime
+
+STOP_SIGNAL = signal.SIGABRT
+START_SIGNAL = signal.SIGFPE
 
 class AirSimLeaderEnv(AirSimEnv):
     def __init__(self, ip_address, step_length, image_shape):
@@ -26,6 +28,9 @@ class AirSimLeaderEnv(AirSimEnv):
             "prev_position": np.zeros(3),
         }
 
+        self.mpc_pid = self.get_mpc_pid()
+
+
         self.drone = airsim.MultirotorClient(ip=ip_address)
         self.action_space = spaces.Discrete(7)
         self._setup_flight()
@@ -38,18 +43,67 @@ class AirSimLeaderEnv(AirSimEnv):
 
     def __del__(self):
         self.drone.reset()
+    
+    def get_mpc_pid():
+        # Define the directory where the log files are stored
+        log_directory = "./log_processes"
+        # Define the expected naming convention for the log files
+        file_name_pattern = "%Y-%m-%d_%H-%M-%S_*_log.txt"
+        # Get a list of all the log files in the log directory
+        log_files = [f for f in os.listdir(log_directory) if os.path.isfile(os.path.join(log_directory, f))]
+        # Filter out any files that do not match the expected naming convention
+        log_files = [f for f in log_files if datetime.datetime.strptime(f.split("_")[0], "%Y-%m-%d")]
+        # Sort the remaining files by their modification time, with the most recent file first
+        log_files.sort(key=lambda x: os.path.getmtime(os.path.join(log_directory, x)), reverse=True)
+        # Get the path to the most recent log file, if one exists
+        if log_files:
+            most_recent_log_file = os.path.join(log_directory, log_files[0])
+        else:
+            most_recent_log_file = None
+        print(f"Most recent log file: {most_recent_log_file}")
+        with open(most_recent_log_file, "r") as log_file:
+            log_contents = log_file.read()
+            pid2 = int(log_contents.split("\n")[1].split(":")[1])
+        print(f"PID of mpc_process: {pid2}")
+        return pid2
+    
+    def send_start_signal(mpc_pid):
+        os.kill(mpc_pid, START_SIGNAL)
+        print("started mpc control")
+
+    def send_stop_signal(mpc_pid):
+        os.kill(mpc_pid, STOP_SIGNAL)
+        print("stopped mpc control")
 
     def _setup_flight(self):
         #also need to start MPC
         self.drone.reset()
-        self.drone.enableApiControl(True, vehicle_name=self.vehicle_name)
-        self.drone.armDisarm(True, vehicle_name=self.vehicle_name)
+        for drone in self.drone_names:
+            self.drone.enableApiControl(True, vehicle_name=drone)
+            self.drone.armDisarm(True, vehicle_name=drone)
 
         # Set home position and velocity
         # self.drone.moveToPositionAsync(-0.55265, -31.9786, -19.0225, 10).join()
         # self.drone.moveByVelocityAsync(1, -0.67, -0.8, 5).join()
-        self.drone.moveToPositionAsync(0, 0, -3, 10,vehicle_name=self.vehicle_name).join()
-        self.drone.moveByVelocityAsync(10, 0, 0, 0.5, vehicle_name=self.vehicle_name).join()
+        f1 = self.drone.moveByMotorPWMsAsync(0.6, 0.6, 0.6, 0.6, 5, vehicle_name="Drone1")
+        f2 = self.drone.moveByMotorPWMsAsync(0.6, 0.6, 0.6, 0.6, 5, vehicle_name="Drone2")
+        f3 = self.drone.moveByMotorPWMsAsync(0.6, 0.6, 0.6, 0.6, 5, vehicle_name="Drone3")
+        f4 = self.drone.moveByMotorPWMsAsync(0.6, 0.6, 0.6, 0.6, 5, vehicle_name="Leader")
+        f1.join()
+        f2.join()
+        f3.join()
+        f4.join()
+        f1 = self.drone.moveByVelocityAsync(10, 0, 0, 0.5, vehicle_name="Drone1")
+        f2 = self.drone.moveByVelocityAsync(10, 0, 0, 0.5, vehicle_name="Drone2")
+        f3 = self.drone.moveByVelocityAsync(10, 0, 0, 0.5, vehicle_name="Drone3")
+        f4 = self.drone.moveByVelocityAsync(10, 0, 0, 0.5, vehicle_name="Leader")
+        f1.join()
+        f2.join()
+        f3.join()
+        f4.join()
+        self.send_start_signal(self.mpc_pid)
+        
+
 
     def transform_obs(self, responses):
         img1d = np.array(responses[0].image_data_float, dtype=float)
@@ -79,17 +133,46 @@ class AirSimLeaderEnv(AirSimEnv):
         self.state["collision"] = collision
 
         return image
+    
+    
+    def thrust_to_pwm(thrust):
+        max_thrust = 4.179446268
+        air_density = 1.293
+        standard_air_density = 1.225
+        air_density_ratio = air_density / standard_air_density
+        pwm = np.zeros(4)
+        for i in range(thrust.size):
+            pwm[i] = max(0.0, min(1.0,thrust[i] / (air_density_ratio * max_thrust)))
+        return pwm
 
+    # def _do_action(self, action):
+    #     quad_offset = self.interpret_action(action)
+    #     quad_vel = self.drone.getMultirotorState(vehicle_name=self.vehicle_name).kinematics_estimated.linear_velocity
+    #     self.drone.moveByVelocityAsync(
+    #         quad_vel.x_val + quad_offset[0],
+    #         quad_vel.y_val + quad_offset[1],
+    #         quad_vel.z_val + quad_offset[2],
+    #         5,
+    #         vehicle_name=self.vehicle_name
+    #     ).join()
     def _do_action(self, action):
+        base_pwm = 0.594
+        rotor_states = self.drone.getRotorStates(vehicle_name = self.vehicle_name)
+        thrusts = [0,0,0,0]
+        for i in range(4):
+            thrusts[i]=rotor_states[i]["thrust"]
+        pwm_rotors = self.thrust_to_pwm(thrusts)
         quad_offset = self.interpret_action(action)
-        quad_vel = self.drone.getMultirotorState(vehicle_name=self.vehicle_name).kinematics_estimated.linear_velocity
-        self.drone.moveByVelocityAsync(
-            quad_vel.x_val + quad_offset[0],
-            quad_vel.y_val + quad_offset[1],
-            quad_vel.z_val + quad_offset[2],
-            5,
-            vehicle_name=self.vehicle_name
-        ).join()
+        pwm1_offset = quad_offset[0] + quad_offset[1] + quad_offset[2]
+        pwm2_offset = quad_offset[0] - quad_offset[1] - quad_offset[2]
+        pwm3_offset = quad_offset[0] - quad_offset[1] + quad_offset[2]
+        pwm4_offset = quad_offset[0] + quad_offset[1] - quad_offset[2]
+        self.drone.moveByMotorPWMsAsync(pwm1_offset + pwm_rotors[0], 
+                                        pwm2_offset + pwm_rotors[1], 
+                                        pwm3_offset + pwm_rotors[2], 
+                                        pwm4_offset + pwm_rotors[3], 
+                                        0.5, 
+                                        vehicle_name=self.vehicle_name)
 
     def _compute_reward(self):
         thresh_dist = 7
@@ -102,9 +185,6 @@ class AirSimLeaderEnv(AirSimEnv):
             np.array([10, 0, -3]),
             np.array([25, 0, -3]),
             np.array([50, 0, -3]),
-            # np.array([193.5974, -55.0786, -46.32256]),
-            # np.array([369.2474, 35.32137, -62.5725]),
-            # np.array([541.3474, 143.6714, -32.07256]),
         ]
 
         quad_pt = np.array(
@@ -162,6 +242,7 @@ class AirSimLeaderEnv(AirSimEnv):
 
     def reset(self):
         self.time = 0
+        self.send_stop_signal(self.mpc_pid)
         self._setup_flight()
         return  self._get_obs(), self.info
 

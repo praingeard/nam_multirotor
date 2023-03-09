@@ -1,5 +1,20 @@
 import airsim
 import numpy as np
+import signal
+
+STOP_SIGNAL = signal.SIGABRT
+START_SIGNAL = signal.SIGFPE
+
+def handle_stop_signal(signum, frame):
+	print("received stop signal")
+	global controller_reset
+	controller_reset = True
+
+
+def handle_start_signal(signum, frame):
+	print("received start signal")
+	global controller_started
+	controller_started == True
 
 def thrust_to_pwm(thrust):
 	max_thrust = 4.179446268
@@ -34,7 +49,7 @@ drone_num = 3
 drone_names = ["Drone1", "Drone2", "Drone3"]
 leader_names = ["Leader"]
 g = 9.81
-timestep_max = 10.0
+timestep_max = 300.0
 timestep_rate = 0.1
 L_matrix = [[3, -1, -1, -1],[-1, 3, -1, -1],[-1, -1, 3, -1],[0, 0, 0, 0]]
 A_matrix = [[0, 1, 1, 0],[1, 0, 1, 1],[1, 1, 0, 0],[0, 0, 0, 0]]
@@ -44,6 +59,18 @@ drone_init_state_xy = [[0, 0, 0, 0, -2, 0, 0, 0], [2, 0, 0, 0, 0, 0, 0, 0],[0, 0
 drone_init_state_z = [[-2, 0],[-2, 0],[-2, 0],[-2, 0]]
 relative_state_xy = [[],[],[]]
 relative_state_z = [[],[],[]]
+
+#signal handling
+controller_started = False
+controller_reset = False
+signal.signal(STOP_SIGNAL, handle_stop_signal)
+signal.signal(START_SIGNAL, handle_start_signal)
+signals = {START_SIGNAL, STOP_SIGNAL}
+# Block the signals so that they can be waited for with sigwaitinfo
+for sig in signals:
+    signal.sigaddset(signal.SIG_BLOCK, sig)
+
+
 
 #compute relative state between each drone and the leader 
 for drone_id in range(drone_num):
@@ -113,30 +140,37 @@ client.confirmConnection()
 for drone in drone_names: 
 	client.enableApiControl(True, drone)
 	client.armDisarm(True, drone)
-	f = client.takeoffAsync(vehicle_name= drone)
-	f.join()
+	# f = client.takeoffAsync(vehicle_name= drone)
+	# f.join()
 
 for leader in leader_names: 
 	client.enableApiControl(True, leader)
 	client.armDisarm(True, leader)
-	f = client.takeoffAsync(vehicle_name= leader)
-	f.join()
+	# f = client.takeoffAsync(vehicle_name= leader)
+	# f.join()
 
-f1 = client.moveByMotorPWMsAsync(0.6, 0.6, 0.6, 0.6, 5, vehicle_name="Drone1")
-f2 = client.moveByMotorPWMsAsync(0.6, 0.6, 0.6, 0.6, 5, vehicle_name="Drone2")
-f3 = client.moveByMotorPWMsAsync(0.6, 0.6, 0.6, 0.6, 5, vehicle_name="Drone3")
-f4 = client.moveByMotorPWMsAsync(0.6, 0.6, 0.6, 0.6, 5, vehicle_name="Leader")
-f1.join()
-f2.join()
-f3.join()
-f4.join()
-
-airsim.wait_key('Press any key to start controller')
+# f1 = client.moveByMotorPWMsAsync(0.6, 0.6, 0.6, 0.6, 5, vehicle_name="Drone1")
+# f2 = client.moveByMotorPWMsAsync(0.6, 0.6, 0.6, 0.6, 5, vehicle_name="Drone2")
+# f3 = client.moveByMotorPWMsAsync(0.6, 0.6, 0.6, 0.6, 5, vehicle_name="Drone3")
+# f4 = client.moveByMotorPWMsAsync(0.6, 0.6, 0.6, 0.6, 5, vehicle_name="Leader")
+# f1.join()
+# f2.join()
+# f3.join()
+# f4.join()
 
 #MPC controller for current step
 timestep = 0
 iteration = 0
 while(timestep <= timestep_max):
+	#wait for command for setup ended
+	if controller_reset == True:
+		timestep = 0
+		iteration = 0
+		controller_started == False
+		controller_reset == False
+	if controller_started == False:
+		print("Waiting for signal to start")
+		siginfo = signal.sigwaitinfo({START_SIGNAL})
 	#relative_state_xy, relative_state_z = get_current_relative_states(relative_state_xy, relative_state_z)
 	timestep = timestep + timestep_rate
 	iteration = iteration +1
@@ -163,7 +197,7 @@ while(timestep <= timestep_max):
 		drone_commands.append(f1)
 	rx_leader, ry_leader, rz_leader = get_leader_state(0)
 	#f_leader = client.moveByMotorPWMsAsync(0.61, 0.61, 0.61, 0.61, timestep_rate/2, vehicle_name="Leader")
-	f_leader = client.moveByRollPitchYawZAsync(0.0, 0.1, 0, rz_leader[0]-0.2, timestep_rate/2, vehicle_name="Leader")
+	#f_leader = client.moveByRollPitchYawZAsync(0.0, 0.1, 0, rz_leader[0]-0.2, timestep_rate/2, vehicle_name="Leader")
 	#drone_commands.append(f_leader)
 	for f in drone_commands:
 		f.join()

@@ -9,23 +9,20 @@ import gym
 from gym import spaces
 from airgym.envs.airsim_env import AirSimEnv
 
-
 class AirSimDroneMultiEnv(AirSimEnv):
     def __init__(self, ip_address, step_length, image_shape):
         super(AirSimDroneMultiEnv, self).__init__(image_shape)
         self.step_length = step_length
         self.image_shape = image_shape
 
-        self.state = {
-            "position_drone1": np.zeros(3),
-            "position_drone2": np.zeros(3),
-            "position_drone3": np.zeros(3),
+        self.state = []
+        self.drone_names = ["Drone1", "Drone2", "Drone3", "Leader"]
+        for drone_id in range(len(self.drone_names)):
+            self.state.append({
+            "position": np.zeros(3),
             "collision": False,
-            "prev_position_drone1": np.zeros(3),
-            "prev_position_drone2": np.zeros(3),
-            "prev_position_drone3": np.zeros(3)
-        }
-
+            "prev_position": np.zeros(3),
+        })
         self.drone = airsim.MultirotorClient(ip=ip_address)
         self.action_space = spaces.Discrete(7)
         self._setup_flight()
@@ -34,30 +31,35 @@ class AirSimDroneMultiEnv(AirSimEnv):
             3, airsim.ImageType.DepthPerspective, True, False
         )
 
-        self.info = {}
-        self.truncated = False
+        self.info_n = {'0': [], '1': [], '2': [], '3': []}
+        self.truncated_n = [False, False, False, False]
 
     def __del__(self):
         self.drone.reset()
 
     def _setup_flight(self):
         self.drone.reset()
-        self.drone.enableApiControl(True, "Drone1")
-        self.drone.enableApiControl(True, "Drone2")
-        self.drone.enableApiControl(True, "Drone3") 
-        self.drone.armDisarm(True, "Drone1")
-        self.drone.armDisarm(True, "Drone2")
-        self.drone.armDisarm(True, "Drone3")
+        for drone in self.drone_names:
+            self.drone.enableApiControl(True, vehicle_name=drone)
+            self.drone.armDisarm(True, vehicle_name=drone)
 
         # Set home position and velocity
-        # self.drone.moveToPositionAsync(-0.55265, -31.9786, -19.0225, 10).join()
-        # self.drone.moveByVelocityAsync(1, -0.67, -0.8, 5).join()
-        self.drone.moveToPositionAsync(0, 0, -2, 10, vehicle_name="Drone1").join()
-        self.drone.moveToPositionAsync(0, 2, -2, 10, vehicle_name="Drone2").join()
-        self.drone.moveToPositionAsync(0, -2, -2, 10, vehicle_name="Drone3").join()
-        self.drone.moveByVelocityAsync(10, 0, 0, 1, vehicle_name="Drone1").join()
-        self.drone.moveByVelocityAsync(10, 0, 0, 1, vehicle_name="Drone2").join()
-        self.drone.moveByVelocityAsync(10, 0, 0, 1, vehicle_name="Drone3").join()
+        f1 = self.drone.moveByMotorPWMsAsync(0.6, 0.6, 0.6, 0.6, 5, vehicle_name="Drone1")
+        f2 = self.drone.moveByMotorPWMsAsync(0.6, 0.6, 0.6, 0.6, 5, vehicle_name="Drone2")
+        f3 = self.drone.moveByMotorPWMsAsync(0.6, 0.6, 0.6, 0.6, 5, vehicle_name="Drone3")
+        f4 = self.drone.moveByMotorPWMsAsync(0.6, 0.6, 0.6, 0.6, 5, vehicle_name="Leader")
+        f1.join()
+        f2.join()
+        f3.join()
+        f4.join()
+        f1 = self.drone.moveByVelocityAsync(10, 0, 0, 0.5, vehicle_name="Drone1")
+        f2 = self.drone.moveByVelocityAsync(10, 0, 0, 0.5, vehicle_name="Drone2")
+        f3 = self.drone.moveByVelocityAsync(10, 0, 0, 0.5, vehicle_name="Drone3")
+        f4 = self.drone.moveByVelocityAsync(10, 0, 0, 0.5, vehicle_name="Leader")
+        f1.join()
+        f2.join()
+        f3.join()
+        f4.join()
 
     def transform_obs(self, responses):
         img1d = np.array(responses[0].image_data_float, dtype=float)
@@ -72,138 +74,137 @@ class AirSimDroneMultiEnv(AirSimEnv):
         return im_final.reshape([84, 84, 1])
 
     def _get_obs(self):
-        responses_drone1 = self.drone.simGetImages([self.image_request], vehicle_name= "Drone1")
-        responses_drone2 = self.drone.simGetImages([self.image_request], vehicle_name= "Drone2")
-        responses_drone3 = self.drone.simGetImages([self.image_request], vehicle_name= "Drone3")
-        image1 = self.transform_obs(responses_drone1)
-        image2 = self.transform_obs(responses_drone2)
-        image3 = self.transform_obs(responses_drone3)
-        self.drone_state_drone1 = self.drone.getMultirotorState(vehicle_name = "Drone1")
-        self.drone_state_drone2 = self.drone.getMultirotorState(vehicle_name = "Drone2")
-        self.drone_state_drone3 = self.drone.getMultirotorState(vehicle_name = "Drone3")
+        obs_n  = []
+        for drone_id in range(len(self.drone_names)):
+            drone = self.drone_names[drone_id]
+            responses_drone = self.drone.simGetImages([self.image_request], vehicle_name= drone)
+            image = self.transform_obs(responses_drone)
+            self.drone_state = self.drone.getMultirotorState(vehicle_name = drone)
+            self.state[drone_id]["prev_position"] = self.state[drone_id]["position"]
+            self.state[drone_id]["position"] = self.drone_state.kinematics_estimated.position
+            self.state[drone_id]["velocity"] = self.drone_state_drone1.kinematics_estimated.linear_velocity
+            collision = self.drone.simGetCollisionInfo(vehicle_name = drone).has_collided
+            self.state[drone_id]["collision"] = collision
+            obs_n.append(image)
+        return obs_n
 
-        self.state["prev_position_drone1"] = self.state["position_drone1"]
-        self.state["prev_position_drone2"] = self.state["position_drone2"]
-        self.state["prev_position_drone3"] = self.state["position_drone3"]
-        self.state["position_drone1"] = self.drone_state_drone1.kinematics_estimated.position
-        self.state["position_drone2"] = self.drone_state_drone2.kinematics_estimated.position
-        self.state["position_drone3"] = self.drone_state_drone3.kinematics_estimated.position
-        self.state["velocity_drone1"] = self.drone_state_drone1.kinematics_estimated.linear_velocity
-        self.state["velocity_drone2"] = self.drone_state_drone2.kinematics_estimated.linear_velocity
-        self.state["velocity_drone3"] = self.drone_state_drone3.kinematics_estimated.linear_velocity
+    def _do_action(self, action_n):
+        quad_offset_n = self.interpret_action(action_n)
+        f_list = []
+        for drone_id in (len(self.drone_names)):
+            drone_name = self.drones_names[drone_id]
+            quad_vel = self.drone.getMultirotorState(vehicle_name = drone_name).kinematics_estimated.linear_velocity
+            f_list.append(self.drone.moveByVelocityAsync(
+                quad_vel.x_val + quad_offset_n[drone_id][0],
+                quad_vel.y_val + quad_offset_n[drone_id][1],
+                quad_vel.z_val + quad_offset_n[drone_id][2],
+                5,
+                vehicle_name = drone_name
+            ))
+        for f_value in (len(f_list)):
+            f_value.join()
 
-        collision = self.drone.simGetCollisionInfo().has_collided
-        self.state["collision"] = collision
-
-        return image1 + image2 + image3
-
-    def _do_action(self, action, drone_name):
-        quad_offset = self.interpret_action(action)
-        quad_vel = self.drone.getMultirotorState(vehicle_name = drone_name).kinematics_estimated.linear_velocity
-        self.drone.moveByVelocityAsync(
-            quad_vel.x_val + quad_offset[0],
-            quad_vel.y_val + quad_offset[1],
-            quad_vel.z_val + quad_offset[2],
-            5,
-        ).join()
-
-    def _compute_reward(self, drone_name):
+    def _compute_reward(self):
         thresh_dist = 7
         beta = 1
 
         z = -10
 
-        position = "position_" + drone_name  
-        velocity = "velocity_" + drone_name
+        position = "position"
+        velocity = "velocity"
 
-        if drone_name == "drone1":
-            pts = [
-                np.array([50, 0, -2])
-            ]
-        if drone_name == "drone2":
-            pts = [
-                np.array([50, 2, -2])
-            ]
-        if drone_name == "drone3":
-            pts = [
-                np.array([50, -2, -2])
-            ]
+        pts_n = [0,0,0,0]
+        quad_pt_n = [0,0,0,0]
+        rewards = [0,0,0,0]
+        done = [False, False, False, False]
+        for drone_id in (len(self.drone_names)):
+            if drone_id == 0:
+                pts_n[drone_id] = np.array([8, -2, -5],
+                                    [23, -2, -5],
+                                    [48, -2, -5],)
+            if drone_id == 1:
+                pts_n[drone_id] = np.array([10, 0, -5],
+                                    [25, 0, -5],
+                                    [50, 0, -5],)
+            if drone_id == 2:
+                pts_n[drone_id] = np.array([8, 2, -5],
+                                    [23, 2, -5],
+                                    [48, 2, -5],)
+            if drone_id == 3:
+                pts_n[drone_id] = np.array([12, 0, -5],
+                                    [27, 0, -5],
+                                    [52, 0, -5],)
 
-        quad_pt = np.array(
-            list(
-                (
-                    self.state[position].x_val,
-                    self.state[position].y_val,
-                    self.state[position].z_val,
+            quad_pt_n[drone_id] = np.array(
+                list(
+                    (
+                        self.state[drone_id][position].x_val,
+                        self.state[drone_id][position].y_val,
+                        self.state[drone_id][position].z_val,
+                    )
                 )
             )
-        )
 
-        if self.state["collision"]:
-            reward = -100
-        else:
-            dist = 10000000
-            for i in range(0, len(pts) - 1):
-                dist = min(
-                    dist,
-                    np.linalg.norm(np.cross((quad_pt - pts[i]), (quad_pt - pts[i + 1])))
-                    / np.linalg.norm(pts[i] - pts[i + 1]),
-                )
+            if self.state[drone_id]["collision"]:
+                rewards[drone_id] = -100
+            else:
+                dist = 10000000
+                for i in range(0, len(pts_n[drone_id]) - 1):
+                    dist = min(
+                        dist,
+                        np.linalg.norm(np.cross((quad_pt_n[drone_id] - pts_n[drone_id][i]), (quad_pt_n[drone_id] - pts_n[drone_id][i + 1])))
+                        / np.linalg.norm(pts_n[drone_id][i] - pts_n[drone_id][i + 1]),
+                    )
 
             if dist > thresh_dist:
-                reward = -10
+                rewards[drone_id] = -10
             else:
                 reward_dist = math.exp(-beta * dist) - 0.5
                 reward_speed = (
                     np.linalg.norm(
                         [
-                            self.state[velocity].x_val,
-                            self.state[velocity].y_val,
-                            self.state[velocity].z_val,
+                            self.state[drone_id][velocity].x_val,
+                            self.state[drone_id][velocity].y_val,
+                            self.state[drone_id][velocity].z_val,
                         ]
                     )
                     - 0.5
                 )
-                reward = reward_dist + reward_speed
+                rewards[drone_id] = reward_dist + reward_speed
 
-        done = False
-        if reward <= -10:
-            done = True
+            done[drone_id] = False
+            if rewards[drone_id] <= -10:
+                done[drone_id] = True
 
-        return reward, done
+        return rewards, done
 
-    def step(self, action):
-        self._do_action(action, "Drone1")
-        self._do_action(action, "Drone2")
-        self._do_action(action, "Drone3")
-        obs = self._get_obs()
-        reward1, done1 = self._compute_reward("drone1")
-        reward2, done2 = self._compute_reward("drone2")
-        reward3, done3 = self._compute_reward("drone3")
+    def step(self, action_n):
+        self._do_action(action_n)
+        obs_n = self._get_obs()
+        reward_n, done_n = self._compute_reward()
 
-        reward = reward1 + reward2 + reward3
-        done = done1 and done2 and done3
-
-        return obs, reward, done, self.truncated, self.info
+        return obs_n, reward_n, done_n, self.truncated_n, self.info_n
 
     def reset(self):
         self._setup_flight()
         return  self._get_obs(), self.info
 
-    def interpret_action(self, action):
-        if action == 0:
-            quad_offset = (self.step_length, 0, 0)
-        elif action == 1:
-            quad_offset = (0, self.step_length, 0)
-        elif action == 2:
-            quad_offset = (0, 0, self.step_length)
-        elif action == 3:
-            quad_offset = (-self.step_length, 0, 0)
-        elif action == 4:
-            quad_offset = (0, -self.step_length, 0)
-        elif action == 5:
-            quad_offset = (0, 0, -self.step_length)
-        else:
-            quad_offset = (0, 0, 0)
+    def interpret_action(self, action_n):
+        quad_offset_n = []
+        for action in action_n:
+            if action == 0:
+                quad_offset_n.append((self.step_length, 0, 0))
+            elif action == 1:
+                quad_offset_n.append((0, self.step_length, 0))
+            elif action == 2:
+                quad_offset_n.append((0, 0, self.step_length))
+            elif action == 3:
+                quad_offset_n.append((-self.step_length, 0, 0))
+            elif action == 4:
+                quad_offset_n.append((0, -self.step_length, 0))
+            elif action == 5:
+                quad_offset_n.append((0, 0, -self.step_length))
+            else:
+                quad_offset_n.append((0, 0, 0))
 
-        return quad_offset
+        return quad_offset_n

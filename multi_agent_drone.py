@@ -44,6 +44,8 @@ f2.join()
 f3.join()
 
 state1 = client.getMultirotorState(vehicle_name="Drone1")
+rotor_state_1 = client.getRotorStates(vehicle_name = "Drone1")
+print("rotor states for drone1 are ", rotor_state_1)
 # s = pprint.pformat(state1)
 # print("state: %s" % s)
 state2 = client.getMultirotorState(vehicle_name="Drone2")
