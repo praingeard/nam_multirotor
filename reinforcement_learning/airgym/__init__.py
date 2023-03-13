@@ -5,9 +5,9 @@ register(
 )
 
 register(
-    id="airsim-drone-multi", entry_point="airgym.envs:AirSimDroneMultiEnv",
+     id="airsim-drone-multi-v0", entry_point="airgym.envs:AirSimDroneMultiEnv",
 )
 
 register(
-    id="airsim-drone-leader", entry_point="airgym.envs:AirSimLeaderEnv",
+    id="airsim-drone-leader-v0", entry_point="airgym.envs:AirSimLeaderEnv",
 )

@@ -15,7 +15,7 @@ env = DummyVecEnv(
     [
         lambda: Monitor(
             gym.make(
-                "airgym:airsim-drone-multi",
+                "airgym:airsim-drone-multi-v0",
                 ip_address="127.0.0.1",
                 step_length=0.25,
                 image_shape=(84, 84, 1),

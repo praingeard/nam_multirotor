@@ -1,0 +1,4 @@
+PID of rl_process: 34258
+PID of mpc_process: 34259
+rl_process return code: None
+mpc_process return code: None

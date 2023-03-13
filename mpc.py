@@ -1,6 +1,8 @@
 import airsim
 import numpy as np
 import signal
+from pysigset import sigaddset
+
 
 STOP_SIGNAL = signal.SIGABRT
 START_SIGNAL = signal.SIGFPE
@@ -8,13 +10,13 @@ START_SIGNAL = signal.SIGFPE
 def handle_stop_signal(signum, frame):
 	print("received stop signal")
 	global controller_reset
-	controller_reset = True
+	#controller_reset = True
 
 
 def handle_start_signal(signum, frame):
 	print("received start signal")
 	global controller_started
-	controller_started == True
+	controller_started = True
 
 def thrust_to_pwm(thrust):
 	max_thrust = 4.179446268
@@ -27,8 +29,8 @@ def thrust_to_pwm(thrust):
 	return pwm
 
 def moments_to_pwm(Mx,My,T):
-	Mx = Mx/1000
-	My = My/1000
+	Mx = Mx/10
+	My = My/10
 	k = 0.0000155
 	l = 0.2275
 	w1sq = (T/(4*k)) + (Mx/(4*k*l)) + (My/(4*k*l)) 
@@ -61,14 +63,14 @@ relative_state_xy = [[],[],[]]
 relative_state_z = [[],[],[]]
 
 #signal handling
-controller_started = False
+controller_started = True
 controller_reset = False
 signal.signal(STOP_SIGNAL, handle_stop_signal)
 signal.signal(START_SIGNAL, handle_start_signal)
 signals = {START_SIGNAL, STOP_SIGNAL}
 # Block the signals so that they can be waited for with sigwaitinfo
 for sig in signals:
-    signal.sigaddset(signal.SIG_BLOCK, sig)
+    sigaddset(signal.SIG_BLOCK, sig)
 
 
 
@@ -82,7 +84,7 @@ print("relative states", relative_state_xy)
 print("relative states z", relative_state_z)
 
 #setup gains 
-beta_gains = [-1, -5, 20, 3]
+beta_gains = [-2, -1, 0.3, 0]
 gamma_gains = [2.9, 3.9]
 
 #setup useful functions 
@@ -164,13 +166,15 @@ iteration = 0
 while(timestep <= timestep_max):
 	#wait for command for setup ended
 	if controller_reset == True:
+		print('controller asked reset')
 		timestep = 0
 		iteration = 0
-		controller_started == False
-		controller_reset == False
+		controller_started = False
+		controller_reset = False
 	if controller_started == False:
 		print("Waiting for signal to start")
 		siginfo = signal.sigwaitinfo({START_SIGNAL})
+	print('mpc started')
 	#relative_state_xy, relative_state_z = get_current_relative_states(relative_state_xy, relative_state_z)
 	timestep = timestep + timestep_rate
 	iteration = iteration +1
