@@ -102,7 +102,7 @@ class AirSimLeaderEnv(AirSimEnv):
         # f2.join()
         # f3.join()
         f4.join()
-        self.send_start_signal(self.mpc_pid)
+        #self.send_start_signal(self.mpc_pid)
         
 
 
@@ -115,6 +115,7 @@ class AirSimLeaderEnv(AirSimEnv):
         image = Image.fromarray(img2d)
         im_final = np.array(image.resize((84, 84)).convert("L"))
         arr = im_final.reshape([84, 84, 1])
+        #return img1d
         return arr
 
     def _get_obs(self):
@@ -243,7 +244,7 @@ class AirSimLeaderEnv(AirSimEnv):
 
     def reset(self):
         self.time = 0
-        self.send_stop_signal(self.mpc_pid)
+        #self.send_stop_signal(self.mpc_pid)
         self._setup_flight()
         image = self._get_obs()
         return  image

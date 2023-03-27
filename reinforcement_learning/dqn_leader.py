@@ -18,14 +18,16 @@ env = DummyVecEnv(
                 "airgym:airsim-drone-leader-v0",
                 ip_address="127.0.0.1",
                 step_length=0.1,
-                image_shape=(84, 84, 1),
+                image_shape=(84,84,1),
             )
         )
     ]
 )
 
+#image_shape=(36864, )
+
 # Wrap env as VecTransposeImage to allow SB to handle frame observations
-env = VecTransposeImage(env)
+#env = VecTransposeImage(env)
 
 # Initialize RL algorithm type and parameters
 model = DQN(

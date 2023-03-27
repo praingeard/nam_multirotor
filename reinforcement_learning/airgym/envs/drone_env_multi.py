@@ -28,7 +28,7 @@ class AirSimDroneMultiEnv(AirSimEnv):
         self._setup_flight()
 
         self.image_request = airsim.ImageRequest(
-            3, airsim.ImageType.DepthPerspective, True, False
+            "0", airsim.ImageType.DepthPerspective, pixels_as_float = True, compress = False
         )
 
         self.info_n = {'0': [], '1': [], '2': [], '3': []}
@@ -71,7 +71,7 @@ class AirSimDroneMultiEnv(AirSimEnv):
         image = Image.fromarray(img2d)
         im_final = np.array(image.resize((84, 84)).convert("L"))
 
-        return im_final.reshape([84, 84, 1])
+        return im_final.reshape(-1)
 
     def _get_obs(self):
         obs_n  = []
@@ -82,7 +82,7 @@ class AirSimDroneMultiEnv(AirSimEnv):
             self.drone_state = self.drone.getMultirotorState(vehicle_name = drone)
             self.state[drone_id]["prev_position"] = self.state[drone_id]["position"]
             self.state[drone_id]["position"] = self.drone_state.kinematics_estimated.position
-            self.state[drone_id]["velocity"] = self.drone_state_drone1.kinematics_estimated.linear_velocity
+            self.state[drone_id]["velocity"] = self.drone_state.kinematics_estimated.linear_velocity
             collision = self.drone.simGetCollisionInfo(vehicle_name = drone).has_collided
             self.state[drone_id]["collision"] = collision
             obs_n.append(image)
@@ -91,8 +91,8 @@ class AirSimDroneMultiEnv(AirSimEnv):
     def _do_action(self, action_n):
         quad_offset_n = self.interpret_action(action_n)
         f_list = []
-        for drone_id in (len(self.drone_names)):
-            drone_name = self.drones_names[drone_id]
+        for drone_id in range(len(self.drone_names)):
+            drone_name = self.drone_names[drone_id]
             quad_vel = self.drone.getMultirotorState(vehicle_name = drone_name).kinematics_estimated.linear_velocity
             f_list.append(self.drone.moveByVelocityAsync(
                 quad_vel.x_val + quad_offset_n[drone_id][0],
@@ -101,7 +101,7 @@ class AirSimDroneMultiEnv(AirSimEnv):
                 5,
                 vehicle_name = drone_name
             ))
-        for f_value in (len(f_list)):
+        for f_value in f_list:
             f_value.join()
 
     def _compute_reward(self):
@@ -117,23 +117,15 @@ class AirSimDroneMultiEnv(AirSimEnv):
         quad_pt_n = [0,0,0,0]
         rewards = [0,0,0,0]
         done = [False, False, False, False]
-        for drone_id in (len(self.drone_names)):
+        for drone_id in range(len(self.drone_names)):
             if drone_id == 0:
-                pts_n[drone_id] = np.array([8, -2, -5],
-                                    [23, -2, -5],
-                                    [48, -2, -5],)
+                pts_n[drone_id] = [np.array([48, -2, -5]), np.array([49, -2, -5]),np.array([50, -2, -5])]
             if drone_id == 1:
-                pts_n[drone_id] = np.array([10, 0, -5],
-                                    [25, 0, -5],
-                                    [50, 0, -5],)
+                pts_n[drone_id] = [np.array([50, 0, -5]), np.array([51, 0, -5]),np.array([52, 0, -5])]
             if drone_id == 2:
-                pts_n[drone_id] = np.array([8, 2, -5],
-                                    [23, 2, -5],
-                                    [48, 2, -5],)
+                pts_n[drone_id] = [np.array([48, 2, -5]), np.array([49, 2, -5]),np.array([50, 2, -5])]
             if drone_id == 3:
-                pts_n[drone_id] = np.array([12, 0, -5],
-                                    [27, 0, -5],
-                                    [52, 0, -5],)
+                pts_n[drone_id] = [np.array([52, 0, -5]), np.array([53, 0, -5]),np.array([54, 0, -5])]
 
             quad_pt_n[drone_id] = np.array(
                 list(
@@ -156,22 +148,21 @@ class AirSimDroneMultiEnv(AirSimEnv):
                         / np.linalg.norm(pts_n[drone_id][i] - pts_n[drone_id][i + 1]),
                     )
 
-            if dist > thresh_dist:
-                rewards[drone_id] = -10
-            else:
-                reward_dist = math.exp(-beta * dist) - 0.5
-                reward_speed = (
-                    np.linalg.norm(
-                        [
-                            self.state[drone_id][velocity].x_val,
-                            self.state[drone_id][velocity].y_val,
-                            self.state[drone_id][velocity].z_val,
-                        ]
+                if dist > thresh_dist:
+                    rewards[drone_id] = -10
+                else:
+                    reward_dist = math.exp(-beta * dist) - 0.5
+                    reward_speed = (
+                        np.linalg.norm(
+                            [
+                                self.state[drone_id][velocity].x_val,
+                                self.state[drone_id][velocity].y_val,
+                                self.state[drone_id][velocity].z_val,
+                            ]
+                        )
+                        - 0.5
                     )
-                    - 0.5
-                )
-                rewards[drone_id] = reward_dist + reward_speed
-
+                    rewards[drone_id] = reward_dist + reward_speed
             done[drone_id] = False
             if rewards[drone_id] <= -10:
                 done[drone_id] = True
@@ -183,15 +174,17 @@ class AirSimDroneMultiEnv(AirSimEnv):
         obs_n = self._get_obs()
         reward_n, done_n = self._compute_reward()
 
-        return obs_n, reward_n, done_n, self.truncated_n, self.info_n
+        return obs_n, reward_n, done_n, self.info_n
 
     def reset(self):
         self._setup_flight()
-        return  self._get_obs(), self.info
+        return  self._get_obs()
 
     def interpret_action(self, action_n):
         quad_offset_n = []
-        for action in action_n:
+        print(action_n[0][0])
+        for drone in range(len(self.drone_names)):
+            action = np.argmax(action_n[drone])
             if action == 0:
                 quad_offset_n.append((self.step_length, 0, 0))
             elif action == 1:

@@ -3,6 +3,7 @@ import gym
 import airgym
 import time
 
+from maddpg import 
 from stable_baselines3 import DQN
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv, VecTransposeImage
@@ -28,7 +29,7 @@ env = DummyVecEnv(
 env = VecTransposeImage(env)
 
 # Initialize RL algorithm type and parameters
-model = DQN(
+model = maddpg(
     "CnnPolicy",
     env,
     learning_rate=0.00025,
