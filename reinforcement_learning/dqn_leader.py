@@ -17,8 +17,8 @@ env = DummyVecEnv(
             gym.make(
                 "airgym:airsim-drone-leader-v0",
                 ip_address="127.0.0.1",
-                step_length=0.1,
-                image_shape=(84,84,1),
+                step_length=0.5,
+                image_shape=(36864,),
             )
         )
     ]
@@ -31,19 +31,19 @@ env = DummyVecEnv(
 
 # Initialize RL algorithm type and parameters
 model = DQN(
-    "CnnPolicy",
+    "MlpPolicy",
     env,
-    learning_rate=0.00025,
+    learning_rate=0.01,
     verbose=1,
     batch_size=32,
     train_freq=4,
-    target_update_interval=10000,
-    learning_starts=10000,
+    target_update_interval=50,
+    learning_starts=1000,
     buffer_size=500000,
     max_grad_norm=10,
+    gamma = 0.99,
     exploration_fraction=0.1,
     exploration_final_eps=0.01,
-    device="cuda",
     tensorboard_log="./tb_logs/",
 )
 
@@ -64,7 +64,7 @@ kwargs["callback"] = callbacks
 
 # Train for a certain number of timesteps
 model.learn(
-    total_timesteps=5e5,
+    total_timesteps=15000,
     tb_log_name="dqn_airsim_leader_run_" + str(time.time()),
     **kwargs
 )

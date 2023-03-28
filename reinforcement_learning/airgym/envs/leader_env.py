@@ -21,7 +21,8 @@ class AirSimLeaderEnv(AirSimEnv):
         self.time = 0
         self.image_shape = image_shape
         self.vehicle_name = "Leader"
-        self.drone_names = ["Drone1", "Drone2", "Drone3", "Leader"]
+        self.drone_names = ["Leader"]
+        #self.drone_names = ["Drone1", "Drone2", "Drone3", "Leader"]
 
         self.state = {
             "position": np.zeros(3),
@@ -37,7 +38,7 @@ class AirSimLeaderEnv(AirSimEnv):
         self._setup_flight()
 
         self.image_request = airsim.ImageRequest(
-            3, airsim.ImageType.DepthPerspective, True, False
+            0, airsim.ImageType.DepthPerspective, True, False
         )
         self.info = {}
         self.truncated = False
@@ -89,15 +90,15 @@ class AirSimLeaderEnv(AirSimEnv):
         # f1 = self.drone.moveByMotorPWMsAsync(0.6, 0.6, 0.6, 0.6, 1, vehicle_name="Drone1")
         # f2 = self.drone.moveByMotorPWMsAsync(0.6, 0.6, 0.6, 0.6, 1, vehicle_name="Drone2")
         # f3 = self.drone.moveByMotorPWMsAsync(0.6, 0.6, 0.6, 0.6, 1, vehicle_name="Drone3")
-        f4 = self.drone.moveByMotorPWMsAsync(0.6, 0.6, 0.6, 0.6, 1, vehicle_name="Leader")
+        #f4 = self.drone.moveByMotorPWMsAsync(0.6, 0.6, 0.6, 0.6, 1, vehicle_name="Leader")
         # f1.join()
         # f2.join()
         # f3.join()
-        f4.join()
+        #f4.join()
         # f1 = self.drone.moveByVelocityAsync(10, 0, 0, 0.5, vehicle_name="Drone1")
         # f2 = self.drone.moveByVelocityAsync(10, 0, 0, 0.5, vehicle_name="Drone2")
         # f3 = self.drone.moveByVelocityAsync(10, 0, 0, 0.5, vehicle_name="Drone3")
-        f4 = self.drone.moveByVelocityAsync(10, 0, 0, 0.5, vehicle_name="Leader")
+        f4 = self.drone.moveByVelocityAsync(1, 0, 0, 0.5, vehicle_name="Leader")
         # f1.join()
         # f2.join()
         # f3.join()
@@ -115,8 +116,8 @@ class AirSimLeaderEnv(AirSimEnv):
         image = Image.fromarray(img2d)
         im_final = np.array(image.resize((84, 84)).convert("L"))
         arr = im_final.reshape([84, 84, 1])
-        #return img1d
-        return arr
+        return img1d
+        #return arr
 
     def _get_obs(self):
         responses = self.drone.simGetImages([self.image_request], vehicle_name=self.vehicle_name)
@@ -126,14 +127,15 @@ class AirSimLeaderEnv(AirSimEnv):
         self.state["prev_position"] = self.state["position"]
         self.state["position"] = self.drone_state.kinematics_estimated.position
         self.state["velocity"] = self.drone_state.kinematics_estimated.linear_velocity
-        collision = False
-        for drone_name in self.drone_names:
-            collision_current = self.drone.simGetCollisionInfo(vehicle_name=drone_name).has_collided
-            if collision_current == True:
-                 collision = True
+        collision = self.drone.simGetCollisionInfo(vehicle_name=self.vehicle_name).has_collided
+        #collision = False
+        #for drone_name in self.drone_names:
+        #    collision_current = self.drone.simGetCollisionInfo(vehicle_name=drone_name).has_collided
+        #    if collision_current == True:
+        #         collision = True
         self.state["collision"] = collision
 
-        return image
+        return image, self.info
     
     
     def thrust_to_pwm(self,thrust):
@@ -153,7 +155,7 @@ class AirSimLeaderEnv(AirSimEnv):
             quad_vel.x_val + quad_offset[0],
             quad_vel.y_val + quad_offset[1],
             quad_vel.z_val + quad_offset[2],
-            5,
+            1,
             vehicle_name=self.vehicle_name
         ).join()
     
@@ -177,17 +179,13 @@ class AirSimLeaderEnv(AirSimEnv):
     #                                     vehicle_name=self.vehicle_name)
 
     def _compute_reward(self):
-        thresh_dist = 7
+        thresh_dist = 75
         thresh_time = 15
         self.time = self.time + 1
         beta = 1
 
         z = -3
-        pts = [
-            np.array([10, 0, -3]),
-            np.array([25, 0, -3]),
-            np.array([50, 0, -3]),
-        ]
+        pt = [50, 0, -3]
 
         quad_pt = np.array(
             list(
@@ -203,20 +201,21 @@ class AirSimLeaderEnv(AirSimEnv):
             reward = -1000
         else:
             dist = 10000000
-            for i in range(0, len(pts) - 1):
-                dist = min(
-                    dist,
-                    np.linalg.norm(np.cross((quad_pt - pts[i]), (quad_pt - pts[i + 1])))
-                    / np.linalg.norm(pts[i] - pts[i + 1]),
-                )
-                print(dist)
+            dist = np.sqrt((quad_pt[0]-pt[0])**2 + (quad_pt[1]-pt[1])**2 + (quad_pt[2]-pt[2])**2)
+            # #for i in range(0, len(pts) - 1):
+            #     dist = min(
+            #         dist,
+            #         np.linalg.norm(np.cross((quad_pt - pts[i]), (quad_pt - pts[i + 1])))
+            #         / np.linalg.norm(pts[i] - pts[i + 1]),
+            #     )
+            print(dist)
 
             if dist > thresh_dist:
-                reward = -10
+                reward = -75
             else:
                 
                 reward_time = -self.time*15
-                reward_dist = math.exp(-beta * dist) - 0.5
+                reward_dist = -dist
                 reward_speed = (
                     np.linalg.norm(
                         [
@@ -225,22 +224,21 @@ class AirSimLeaderEnv(AirSimEnv):
                             self.state["velocity"].z_val,
                         ]
                     )
-                    - 0.5
                 )
                 reward = reward_dist + reward_speed
                 print(reward_dist, reward_speed)
         done = False
-        if reward <= -10 or self.time >=10:
+        if reward <= -75 or self.time >=15:
             done = True
 
         return reward, done
 
     def step(self, action):
         self._do_action(action)
-        obs = self._get_obs()
+        (obs,info) = self._get_obs()
         reward, done = self._compute_reward()
 
-        return obs, reward, done, self.info
+        return obs, reward, self.truncated, done, self.info
 
     def reset(self):
         self.time = 0
