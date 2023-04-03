@@ -2,6 +2,9 @@ import setup_path
 import gym
 import airgym
 import time
+import torch
+import torch.cuda
+import tensorflow as tf
 
 from stable_baselines3 import DQN
 from stable_baselines3.common.monitor import Monitor
@@ -9,6 +12,21 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecTransposeImage
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.env_checker import check_env
+
+try:
+    tf_gpus = tf.config.list_physical_devices('GPU')
+    for gpu in tf_gpus:
+        tf.config.experimental.set_memory_growth(gpu, True)
+except:
+    pass 
+
+
+def force_cudnn_initialization():
+    s = 32
+    dev = torch.device('cuda')
+    torch.nn.functional.conv2d(torch.zeros(s, s, s, s, device=dev), torch.zeros(s, s, s, s, device=dev))
+    
+force_cudnn_initialization()
 
 # Create a DummyVecEnv for main airsim gym env
 env = DummyVecEnv(
@@ -18,7 +36,7 @@ env = DummyVecEnv(
                 "airgym:airsim-drone-leader-v0",
                 ip_address="127.0.0.1",
                 step_length=0.5,
-                image_shape=(36864,),
+                image_shape=(84,84,1),
             )
         )
     ]
@@ -27,23 +45,20 @@ env = DummyVecEnv(
 #image_shape=(36864, )
 
 # Wrap env as VecTransposeImage to allow SB to handle frame observations
-#env = VecTransposeImage(env)
+env = VecTransposeImage(env)
 
 # Initialize RL algorithm type and parameters
 model = DQN(
-    "MlpPolicy",
+    "CnnPolicy",
     env,
-    learning_rate=0.01,
+    learning_rate=0.005,
     verbose=1,
     batch_size=32,
     train_freq=4,
-    target_update_interval=50,
-    learning_starts=1000,
+    target_update_interval=500,
+    learning_starts=4000,
     buffer_size=500000,
     max_grad_norm=10,
-    gamma = 0.99,
-    exploration_fraction=0.1,
-    exploration_final_eps=0.01,
     tensorboard_log="./tb_logs/",
 )
 
@@ -64,7 +79,7 @@ kwargs["callback"] = callbacks
 
 # Train for a certain number of timesteps
 model.learn(
-    total_timesteps=15000,
+    total_timesteps=30000,
     tb_log_name="dqn_airsim_leader_run_" + str(time.time()),
     **kwargs
 )

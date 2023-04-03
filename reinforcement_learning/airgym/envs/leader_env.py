@@ -108,16 +108,17 @@ class AirSimLeaderEnv(AirSimEnv):
 
 
     def transform_obs(self, responses):
-        print('reshaping image')
         img1d = np.array(responses[0].image_data_float, dtype=float)
         img1d = 255 / np.maximum(np.ones(img1d.size), img1d)
+        if img1d.size != 36864:
+            img1d = np.zeros(36864)
+            print("Error in the image gotten")
         img2d = np.reshape(img1d, (responses[0].height, responses[0].width))
 
         image = Image.fromarray(img2d)
         im_final = np.array(image.resize((84, 84)).convert("L"))
         arr = im_final.reshape([84, 84, 1])
-        return img1d
-        #return arr
+        return arr
 
     def _get_obs(self):
         responses = self.drone.simGetImages([self.image_request], vehicle_name=self.vehicle_name)
@@ -135,7 +136,7 @@ class AirSimLeaderEnv(AirSimEnv):
         #         collision = True
         self.state["collision"] = collision
 
-        return image, self.info
+        return image
     
     
     def thrust_to_pwm(self,thrust):
@@ -228,17 +229,19 @@ class AirSimLeaderEnv(AirSimEnv):
                 reward = reward_dist + reward_speed
                 print(reward_dist, reward_speed)
         done = False
-        if reward <= -75 or self.time >=15:
+        if reward <= -75 or self.time >=25:
             done = True
+            
+        print(reward)
 
         return reward, done
 
     def step(self, action):
         self._do_action(action)
-        (obs,info) = self._get_obs()
+        obs = self._get_obs()
         reward, done = self._compute_reward()
 
-        return obs, reward, self.truncated, done, self.info
+        return obs, reward, done, self.info 
 
     def reset(self):
         self.time = 0
