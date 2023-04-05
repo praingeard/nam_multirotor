@@ -113,7 +113,7 @@ class AirSimLeaderEnv(AirSimEnv):
         if img1d.size != 36864:
             img1d = np.zeros(36864)
             print("Error in the image gotten")
-        img2d = np.reshape(img1d, (responses[0].height, responses[0].width))
+        img2d = np.reshape(img1d, (36864, 1))
 
         image = Image.fromarray(img2d)
         im_final = np.array(image.resize((84, 84)).convert("L"))
@@ -199,7 +199,7 @@ class AirSimLeaderEnv(AirSimEnv):
         )
 
         if self.state["collision"]:
-            reward = -1000
+            reward = -2000
         else:
             dist = 10000000
             dist = np.sqrt((quad_pt[0]-pt[0])**2 + (quad_pt[1]-pt[1])**2 + (quad_pt[2]-pt[2])**2)
@@ -226,7 +226,7 @@ class AirSimLeaderEnv(AirSimEnv):
                         ]
                     )
                 )
-                reward = reward_dist + reward_speed
+                reward = reward_dist + reward_speed + 100
                 print(reward_dist, reward_speed)
         done = False
         if reward <= -75 or self.time >=25:
