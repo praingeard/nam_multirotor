@@ -1,4 +1,4 @@
-import setup_path
+
 import airsim
 
 import numpy as np

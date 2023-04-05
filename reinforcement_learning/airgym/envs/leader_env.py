@@ -251,19 +251,36 @@ class AirSimLeaderEnv(AirSimEnv):
         return  image
 
     def interpret_action(self, action):
-        if action == 0:
-            quad_offset = (self.step_length, 0, 0)
-        elif action == 1:
-            quad_offset = (0, self.step_length, 0)
-        elif action == 2:
-            quad_offset = (0, 0, self.step_length)
-        elif action == 3:
-            quad_offset = (-self.step_length, 0, 0)
-        elif action == 4:
-            quad_offset = (0, -self.step_length, 0)
-        elif action == 5:
-            quad_offset = (0, 0, -self.step_length)
-        else:
+        #20 cases to take into account (3 dir * +/- 1)
+        if action >= 20:
             quad_offset = (0, 0, 0)
+            return quad_offset
+        #setting delta value to change speed in both directions
+        if action >= 10:
+            delta = -1
+        else:
+            delta = 1
+        action = action % 10
+        offset = delta*self.step_length
+        if action == 0:
+            quad_offset = (offset, 0, 0)
+        elif action == 1:
+            quad_offset = (0, offset, 0)
+        elif action == 2:
+            quad_offset = (0, 0, offset)
+        elif action == 3:
+            quad_offset = (offset, offset, 0)
+        elif action == 4:
+            quad_offset = (0, offset, offset)
+        elif action == 5:
+            quad_offset = (offset, 0, offset)
+        elif action == 6:
+            quad_offset = (offset, -offset, 0)
+        elif action == 7:
+            quad_offset = (0, offset, -offset)
+        elif action == 8:
+            quad_offset = (offset, 0, -offset)
+        else:
+            quad_offset = (offset, offset, offset)
 
         return quad_offset
