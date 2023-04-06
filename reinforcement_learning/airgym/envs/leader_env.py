@@ -34,13 +34,22 @@ class AirSimLeaderEnv(AirSimEnv):
 
 
         self.drone = airsim.MultirotorClient(ip=ip_address)
-        self.action_space = spaces.Discrete(7)
+        self._action_space = spaces.Discrete(21)
+        self.observation_space = spaces.Box(
+                low=0, high=255, dtype=np.uint8, shape=image_shape
+            )
         self._setup_flight()
 
         self.image_request = airsim.ImageRequest(
             0, airsim.ImageType.DepthPerspective, True, False
         )
-        self.info = {}
+        
+        #info init
+        self.image_show_size = (144, 256)
+        self.frame_num = 0    
+        self.action_num = 0
+        #init empty image of right size
+        self.last_image = Image.fromarray(np.reshape(np.zeros(36864), self.image_show_size))
         self.truncated = False
 
     def __del__(self):
@@ -105,18 +114,25 @@ class AirSimLeaderEnv(AirSimEnv):
         f4.join()
         #self.send_start_signal(self.mpc_pid)
         
+    def _get_info(self) -> Dict[str, Any]:
+        info = {
+            "frame_num": self.frame_num,
+            "last_image": self.last_image,
+            "action_number": self.action_num,
+        }
 
+        return info
 
     def transform_obs(self, responses):
+        self.frame_num += 1
         img1d = np.array(responses[0].image_data_float, dtype=float)
         img1d = 255 / np.maximum(np.ones(img1d.size), img1d)
         if img1d.size != 36864:
             img1d = np.zeros(36864)
             print("Error in the image gotten")
-        img2d = np.reshape(img1d, (36864, 1))
-
-        image = Image.fromarray(img2d)
-        im_final = np.array(image.resize((84, 84)).convert("L"))
+        img2d = np.reshape(img1d, self.image_show_size)
+        self.last_image = Image.fromarray(img2d)
+        im_final = np.array(self.last_image.resize((84, 84)).convert("L"))
         arr = im_final.reshape([84, 84, 1])
         return arr
 
@@ -150,6 +166,7 @@ class AirSimLeaderEnv(AirSimEnv):
         return pwm
 
     def _do_action(self, action):
+        self.action_num += 1
         quad_offset = self.interpret_action(action)
         quad_vel = self.drone.getMultirotorState(vehicle_name=self.vehicle_name).kinematics_estimated.linear_velocity
         self.drone.moveByVelocityAsync(
@@ -183,7 +200,6 @@ class AirSimLeaderEnv(AirSimEnv):
         thresh_dist = 75
         thresh_time = 15
         self.time = self.time + 1
-        beta = 1
 
         z = -3
         pt = [50, 0, -3]
@@ -201,15 +217,7 @@ class AirSimLeaderEnv(AirSimEnv):
         if self.state["collision"]:
             reward = -2000
         else:
-            dist = 10000000
             dist = np.sqrt((quad_pt[0]-pt[0])**2 + (quad_pt[1]-pt[1])**2 + (quad_pt[2]-pt[2])**2)
-            # #for i in range(0, len(pts) - 1):
-            #     dist = min(
-            #         dist,
-            #         np.linalg.norm(np.cross((quad_pt - pts[i]), (quad_pt - pts[i + 1])))
-            #         / np.linalg.norm(pts[i] - pts[i + 1]),
-            #     )
-            print(dist)
 
             if dist > thresh_dist:
                 reward = -75
@@ -239,9 +247,10 @@ class AirSimLeaderEnv(AirSimEnv):
     def step(self, action):
         self._do_action(action)
         obs = self._get_obs()
+        info = self._get_info
         reward, done = self._compute_reward()
 
-        return obs, reward, done, self.info 
+        return obs, reward, done, info 
 
     def reset(self):
         self.time = 0
@@ -284,3 +293,10 @@ class AirSimLeaderEnv(AirSimEnv):
             quad_offset = (offset, offset, offset)
 
         return quad_offset
+    
+    @property
+    def action_space(self) -> spaces.Discrete:
+        """
+        Return Gym's action space.
+        """
+        return self._action_space

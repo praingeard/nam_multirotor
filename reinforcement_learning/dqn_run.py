@@ -12,7 +12,7 @@ env = DummyVecEnv(
                 "airgym:airsim-drone-leader-v0",
                 ip_address="127.0.0.1",
                 step_length=0.5,
-                image_shape=(36864,),
+                image_shape=(84,84,1),
             )
         )
     ]
