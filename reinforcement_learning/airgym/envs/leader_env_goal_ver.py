@@ -32,10 +32,14 @@ class AirSimLeaderGoalEnv(AirSimGoalEnv):
         }
 
         self.mpc_pid = self.get_mpc_pid()
-
+        self.achieved_goal = 75
+        self.desired_goal = 5
 
         self.drone = airsim.MultirotorClient(ip=ip_address)
         self._action_space = spaces.Discrete(21)
+        self._obs_space = spaces.Dict({"observation": spaces.Box(0, 255, shape=image_shape, dtype=np.uint8), 
+                                      "desired_goal": spaces.Discrete(75), 
+                                      "achieved_goal": spaces.Discrete(75)}, seed=0)
         self.reward_range = (-2075,2000)
         self._setup_flight()
 
@@ -150,8 +154,11 @@ class AirSimLeaderGoalEnv(AirSimGoalEnv):
         #    if collision_current == True:
         #         collision = True
         self.state["collision"] = collision
+        obs= {"observation" : image,
+              "desired_goal" : self.desired_goal,
+              "achieved_goal" : self.achieved_goal}
 
-        return image
+        return obs
     
     
     def thrust_to_pwm(self,thrust):
@@ -197,11 +204,10 @@ class AirSimLeaderGoalEnv(AirSimGoalEnv):
 
     def _compute_reward(self):
         thresh_dist = 75
-        thresh_time = 15
         self.time = self.time + 1
+        dist = 75
 
-        z = -3
-        pt = [50, 0, -3]
+        pt = [20, 0, -3]
 
         quad_pt = np.array(
             list(
@@ -214,15 +220,15 @@ class AirSimLeaderGoalEnv(AirSimGoalEnv):
         )
 
         if self.state["collision"]:
-            reward = -2000
+            reward = -5000
         else:
             dist = np.sqrt((quad_pt[0]-pt[0])**2 + (quad_pt[1]-pt[1])**2 + (quad_pt[2]-pt[2])**2)
 
             if dist > thresh_dist:
                 reward = -75
+            elif dist < 5:
+                reward = 500
             else:
-                
-                reward_time = -self.time*15
                 reward_dist = -dist
                 reward_speed = (
                     np.linalg.norm(
@@ -233,13 +239,14 @@ class AirSimLeaderGoalEnv(AirSimGoalEnv):
                         ]
                     )
                 )
-                reward = reward_dist + reward_speed + 100
-                print(reward_dist, reward_speed)
+                reward = reward_dist + 100
         done = False
-        if reward <= -75 or self.time >=25:
+        if self.time >=25 or reward>=500:
             done = True
             
-        print(reward)
+        self.achieved_goal = dist
+            
+        print(reward, dist)
 
         return reward, done
 
@@ -256,8 +263,8 @@ class AirSimLeaderGoalEnv(AirSimGoalEnv):
         self.time = 0
         #self.send_stop_signal(self.mpc_pid)
         self._setup_flight()
-        image = self._get_obs()
-        return  image
+        obs = self._get_obs()
+        return  obs
 
     def interpret_action(self, action):
         #20 cases to take into account (3 dir * +/- 1)
@@ -300,3 +307,10 @@ class AirSimLeaderGoalEnv(AirSimGoalEnv):
         Return Gym's action space.
         """
         return self._action_space
+    
+    @property
+    def observation_space(self) -> spaces.Dict:
+        """
+        Return Gym's observation space.
+        """
+        return self._obs_space

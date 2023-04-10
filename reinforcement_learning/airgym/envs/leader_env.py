@@ -197,11 +197,10 @@ class AirSimLeaderEnv(AirSimEnv):
 
     def _compute_reward(self):
         thresh_dist = 75
-        thresh_time = 15
+        dist = 75
         self.time = self.time + 1
 
-        z = -3
-        pt = [50, 0, -3]
+        pt = [20, 0, -3]
 
         quad_pt = np.array(
             list(
@@ -235,13 +234,12 @@ class AirSimLeaderEnv(AirSimEnv):
                         ]
                     )
                 )
-                reward = reward_dist + 100
-                print(reward_dist)
+                reward = reward_dist
         done = False
         if self.time >=25 or reward >=500:
             done = True
             
-        print(reward)
+        print(reward, dist)
 
         return reward, done
 
@@ -250,6 +248,7 @@ class AirSimLeaderEnv(AirSimEnv):
         obs = self._get_obs()
         info = self._get_info
         reward, done = self._compute_reward()
+        info = {}
 
         return obs, reward, done, info 
 

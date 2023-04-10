@@ -34,7 +34,6 @@ class AirSimGoalEnv(gym.GoalEnv):
     metadata = {"render.modes": ["rgb_array"]}
 
     def __init__(self, image_shape):
-        self.observation_space = spaces.Box(0, 255, shape=image_shape, dtype=np.uint8)
         self.viewer = None
 
     def __del__(self):

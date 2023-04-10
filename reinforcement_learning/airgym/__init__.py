@@ -15,3 +15,7 @@ register(
 register(
     id="airsim-drone-leader-v1", entry_point="airgym.envs:AirSimLeaderGoalEnv",
 )
+
+register(
+    id="airsim-drone-leader-v2", entry_point="airgym.envs:AirSimLeaderGoalHerEnv",
+)
