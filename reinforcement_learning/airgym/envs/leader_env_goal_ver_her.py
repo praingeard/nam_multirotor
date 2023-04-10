@@ -3,7 +3,7 @@ import numpy as np
 import math
 
 from gym import spaces
-from airgym.envs.airsim_env import AirSimEnv
+from airgym.envs.airsim_env import AirSimGoalEnv
 from PIL import Image
 
 import signal
@@ -14,9 +14,9 @@ from typing import Dict, Any
 STOP_SIGNAL = signal.SIGABRT
 START_SIGNAL = signal.SIGFPE
 
-class AirSimLeaderEnv(AirSimEnv):
+class AirSimLeaderGoalEnv(AirSimGoalEnv):
     def __init__(self, ip_address, step_length, image_shape):
-        super(AirSimLeaderEnv, self).__init__(image_shape)
+        super(AirSimLeaderGoalEnv, self).__init__(image_shape)
         self.step_length = step_length
         self.step_num = 0
         self.time = 0
@@ -36,7 +36,7 @@ class AirSimLeaderEnv(AirSimEnv):
 
         self.drone = airsim.MultirotorClient(ip=ip_address)
         self._action_space = spaces.Discrete(21)
-        self.reward_range = (-50000,3000)
+        self.reward_range = (-2075,2000)
         self._setup_flight()
 
         self.image_request = airsim.ImageRequest(
@@ -214,14 +214,12 @@ class AirSimLeaderEnv(AirSimEnv):
         )
 
         if self.state["collision"]:
-            reward = -5000
+            reward = -2000
         else:
             dist = np.sqrt((quad_pt[0]-pt[0])**2 + (quad_pt[1]-pt[1])**2 + (quad_pt[2]-pt[2])**2)
 
             if dist > thresh_dist:
                 reward = -75
-            elif dist < 5:
-                reward = 500
             else:
                 
                 reward_time = -self.time*15
@@ -235,10 +233,10 @@ class AirSimLeaderEnv(AirSimEnv):
                         ]
                     )
                 )
-                reward = reward_dist + 100
-                print(reward_dist)
+                reward = reward_dist + reward_speed + 100
+                print(reward_dist, reward_speed)
         done = False
-        if self.time >=25 or reward >=500:
+        if reward <= -75 or self.time >=25:
             done = True
             
         print(reward)
@@ -250,6 +248,7 @@ class AirSimLeaderEnv(AirSimEnv):
         obs = self._get_obs()
         info = self._get_info
         reward, done = self._compute_reward()
+        info = {}
 
         return obs, reward, done, info 
 
@@ -295,7 +294,6 @@ class AirSimLeaderEnv(AirSimEnv):
 
         return quad_offset
     
-    #observation space already set up by the Airgym env class
     @property
     def action_space(self) -> spaces.Discrete:
         """
