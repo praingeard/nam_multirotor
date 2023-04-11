@@ -7,6 +7,7 @@ import torch.cuda
 import tensorflow as tf
 
 from stable_baselines3 import DQN
+from sb3_contrib import QRDQN
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv, VecTransposeImage
 from stable_baselines3.common.evaluation import evaluate_policy
@@ -63,7 +64,7 @@ env = VecTransposeImage(env)
 #     tensorboard_log="./tb_logs/",
 # )
 
-model = DQN(
+model = QRDQN(
     "CnnPolicy",
     env,
     learning_rate=0.005,

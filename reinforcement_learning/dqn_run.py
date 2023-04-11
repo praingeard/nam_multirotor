@@ -3,6 +3,7 @@ import gym
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv, VecTransposeImage
 from stable_baselines3 import DQN
+from sb3_contrib import QRDQN 
 from stable_baselines3.common.evaluation import evaluate_policy
 
 env = DummyVecEnv(
@@ -18,7 +19,7 @@ env = DummyVecEnv(
     ]
 )
 
-model = DQN.load("best_model")
+model = QRDQN.load("best_model")
 obs = env.reset()
 for i in range(1000):
     action, _states = model.predict(obs)

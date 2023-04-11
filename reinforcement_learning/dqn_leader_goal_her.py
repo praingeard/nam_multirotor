@@ -65,7 +65,7 @@ callbacks = []
 eval_callback = EvalCallback(
     env,
     callback_on_new_best=None,
-    n_eval_episodes=5,
+    n_eval_episodes=10,
     best_model_save_path=".",
     log_path=".",
     eval_freq=1000,
@@ -78,9 +78,9 @@ kwargs["callback"] = callbacks
 # Train for a certain number of timesteps
 model.learn(
     total_timesteps=30000,
-    tb_log_name="dqn_airsim_leader_run_" + str(time.time()),
+    tb_log_name="her_airsim_leader_run_" + str(time.time()),
     **kwargs
 )
 
 # Save policy weights
-model.save("dqn_airsim_leader_policy")
+model.save("her_airsim_leader_policy")
