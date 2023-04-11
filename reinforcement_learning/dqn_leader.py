@@ -35,7 +35,7 @@ env = DummyVecEnv(
     [
         lambda: Monitor(
             gym.make(
-                "airgym:airsim-drone-leader-v0",
+                "airgym:airsim-drone-leader-v3",
                 ip_address="127.0.0.1",
                 step_length=0.5,
                 image_shape=(84,84,1),
@@ -50,27 +50,26 @@ env = DummyVecEnv(
 env = VecTransposeImage(env)
 
 # Initialize RL algorithm type and parameters
-# model = DQN(
+model = DQN(
+    "CnnPolicy",
+    env,
+    learning_rate=0.0025,
+    verbose=1,
+    batch_size=32,
+    train_freq=4,
+    target_update_interval=500,
+    buffer_size=500000,
+    max_grad_norm=10,
+    tensorboard_log="./tb_logs/",
+)
+
+# model = QRDQN(
 #     "CnnPolicy",
 #     env,
 #     learning_rate=0.005,
 #     verbose=1,
-#     batch_size=32,
-#     train_freq=4,
-#     target_update_interval=500,
-#     learning_starts=4000,
-#     buffer_size=500000,
-#     max_grad_norm=10,
 #     tensorboard_log="./tb_logs/",
 # )
-
-model = QRDQN(
-    "CnnPolicy",
-    env,
-    learning_rate=0.005,
-    verbose=1,
-    tensorboard_log="./tb_logs/",
-)
 
 # Create an evaluation callback with the same env, called every 10000 iterations
 callbacks = []
@@ -80,7 +79,8 @@ eval_callback = EvalCallback(
     n_eval_episodes=5,
     best_model_save_path=".",
     log_path=".",
-    eval_freq=1000,
+    eval_freq=500,
+    deterministic=True
 )
 callbacks.append(eval_callback)
 
@@ -89,7 +89,7 @@ kwargs["callback"] = callbacks
 
 # Train for a certain number of timesteps
 model.learn(
-    total_timesteps=30000,
+    total_timesteps=100000,
     tb_log_name="dqn_airsim_leader_run_" + str(time.time()),
     **kwargs
 )
