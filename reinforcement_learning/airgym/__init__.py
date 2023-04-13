@@ -23,3 +23,7 @@ register(
 register(
     id="airsim-drone-leader-v3", entry_point="airgym.envs:AirSimLeader2DEnv",
 )
+
+register(
+    id="airsim-drone-leader-v4", entry_point="airgym.envs:AirSimLeader2DHerEnv",
+)

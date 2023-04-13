@@ -6,12 +6,12 @@ import torch
 import torch.cuda
 import tensorflow as tf
 
-from stable_baselines3 import DQN
+from stable_baselines3 import DQN, HerReplayBuffer
 from sb3_contrib import QRDQN
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv, VecTransposeImage
 from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.common.callbacks import EvalCallback
+from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback, CallbackList
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.vec_env import VecFrameStack
 
@@ -35,7 +35,7 @@ env = DummyVecEnv(
     [
         lambda: Monitor(
             gym.make(
-                "airgym:airsim-drone-leader-v3",
+                "airgym:airsim-drone-leader-v4",
                 ip_address="127.0.0.1",
                 step_length=1.0,
                 image_shape=(84,84,1),
@@ -43,6 +43,7 @@ env = DummyVecEnv(
         )
     ]
 )
+goal_selection_strategy = 'future'
 
 #check_env(env)
 
@@ -51,49 +52,68 @@ env = VecTransposeImage(env)
 
 # Initialize RL algorithm type and parameters
 model = DQN(
-    "CnnPolicy",
+    "MultiInputPolicy",
     env,
-    learning_rate=0.00001,
+    replay_buffer_class=HerReplayBuffer,
+    # Parameters for HER
+    replay_buffer_kwargs=dict(
+        n_sampled_goal=4,
+        goal_selection_strategy=goal_selection_strategy,
+    ),
+    tensorboard_log="./tb_logs_new/",
     verbose=1,
-    batch_size=32,
-    train_freq=4,
-    target_update_interval=100,
-    buffer_size=500000,
-    max_grad_norm=10,
-    gamma=0.95,
-    tensorboard_log="./tb_logs/",
 )
+
+# model = DQN(
+#     "CnnPolicy",
+#     env,
+#     learning_rate=0.005,
+#     verbose=1,
+#     target_update_interval=500,
+#     learning_starts=6000,
+#     buffer_size=1000000,
+#     tensorboard_log="./tb_logs_new/",
+# )
 
 # model = QRDQN(
 #     "CnnPolicy",
 #     env,
 #     learning_rate=0.005,
 #     verbose=1,
+    # batch_size=32,
+    # train_freq=4,
 #     tensorboard_log="./tb_logs/",
 # )
 
+
+
+# Save a checkpoint every 1000 steps
+checkpoint_callback = CheckpointCallback(
+  save_freq=1000,
+  save_path="./logs_model/" + str(time.time()),
+  name_prefix="rl_model" + str(time.time()),
+  save_replay_buffer=True,
+  save_vecnormalize=True,
+)
+
 # Create an evaluation callback with the same env, called every 10000 iterations
-callbacks = []
 eval_callback = EvalCallback(
     env,
-    callback_on_new_best=None,
-    n_eval_episodes=5,
-    best_model_save_path=".",
-    log_path=".",
+    n_eval_episodes=12,
+    best_model_save_path="." + str(time.time()),
+    log_path="." + str(time.time()),
     eval_freq=500,
-    deterministic=True
+    deterministic=False
 )
-callbacks.append(eval_callback)
-
-kwargs = {}
-kwargs["callback"] = callbacks
+callbacks = CallbackList([checkpoint_callback, eval_callback])
 
 # Train for a certain number of timesteps
 model.learn(
     total_timesteps=150000,
-    tb_log_name="dqn_airsim_leader_run_" + str(time.time()),
-    **kwargs
+    tb_log_name="dqn_airsim_leader_run_new_2" + str(time.time()),
+    callback = callbacks,
+    progress_bar=True
 )
 
 # Save policy weights
-model.save("dqn_airsim_leader_policy")
+model.save("dqn_airsim_leader_policy_new_2")

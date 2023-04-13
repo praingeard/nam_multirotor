@@ -36,7 +36,7 @@ class AirSimEnv(gym.Env):
     def render(self):
         return self._get_obs()
     
-class AirSimGoalEnvOld(gym.GoalEnv):
+class AirSimGoalEnv(gym.GoalEnv):
     metadata = {"render.modes": ["rgb_array"]}
 
     def __init__(self, image_shape):
@@ -61,7 +61,7 @@ class AirSimGoalEnvOld(gym.GoalEnv):
         return self._get_obs()
 
 
-class AirSimGoalEnv(gym.Env):
+class AirSimGoalOldEnv(gym.Env):
     r"""A goal-based environment. It functions just as any regular Gym environment but it
     imposes a required structure on the observation_space. More concretely, the observation
     space is required to contain at least three elements, namely `observation`, `desired_goal`, and

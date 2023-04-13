@@ -19,8 +19,8 @@ env = DummyVecEnv(
     ]
 )
 
-model = QRDQN.load("best_model")
+model = DQN.load("dqn_airsim_leader_policy_new_")
 obs = env.reset()
 for i in range(1000):
-    action, _states = model.predict(obs)
+    action, _states = model.predict(obs, deterministic = True)
     obs, rewards, dones, info = env.step(action)
