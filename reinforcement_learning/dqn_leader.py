@@ -37,7 +37,7 @@ env = DummyVecEnv(
             gym.make(
                 "airgym:airsim-drone-leader-v3",
                 ip_address="127.0.0.1",
-                step_length=0.5,
+                step_length=1.0,
                 image_shape=(84,84,1),
             )
         )
@@ -53,13 +53,14 @@ env = VecTransposeImage(env)
 model = DQN(
     "CnnPolicy",
     env,
-    learning_rate=0.0025,
+    learning_rate=0.00001,
     verbose=1,
     batch_size=32,
     train_freq=4,
-    target_update_interval=500,
+    target_update_interval=100,
     buffer_size=500000,
     max_grad_norm=10,
+    gamma=0.95,
     tensorboard_log="./tb_logs/",
 )
 
@@ -89,7 +90,7 @@ kwargs["callback"] = callbacks
 
 # Train for a certain number of timesteps
 model.learn(
-    total_timesteps=100000,
+    total_timesteps=150000,
     tb_log_name="dqn_airsim_leader_run_" + str(time.time()),
     **kwargs
 )

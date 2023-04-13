@@ -10,6 +10,7 @@ import signal
 import os
 import datetime
 from typing import Dict, Any
+import math
 
 STOP_SIGNAL = signal.SIGABRT
 START_SIGNAL = signal.SIGFPE
@@ -115,11 +116,19 @@ class AirSimLeader2DEnv(AirSimEnv):
     def _do_action(self, action):
         self.action_num += 1
         quad_offset = self.interpret_action(action)
-        quad_vel = self.drone.getMultirotorState(vehicle_name=self.vehicle_name).kinematics_estimated.linear_velocity
-        self.drone.moveByVelocityAsync(
-            quad_vel.x_val + quad_offset[0],
-            quad_vel.y_val + quad_offset[1],
-            quad_vel.z_val + quad_offset[2],
+        # quad_vel = self.drone.getMultirotorState(vehicle_name=self.vehicle_name).kinematics_estimated.linear_velocity
+        # self.drone.moveByVelocityAsync(
+        #     quad_vel.x_val + quad_offset[0],
+        #     quad_vel.y_val + quad_offset[1],
+        #     quad_vel.z_val + quad_offset[2],
+        #     1,
+        #     vehicle_name=self.vehicle_name
+        # ).join()
+        quad_pos = self.drone.getMultirotorState(vehicle_name=self.vehicle_name).kinematics_estimated.position
+        self.drone.moveToPositionAsync(
+            quad_pos.x_val + quad_offset[0],
+            quad_pos.y_val + quad_offset[1],
+            -3,
             1,
             vehicle_name=self.vehicle_name
         ).join()
@@ -131,9 +140,7 @@ class AirSimLeader2DEnv(AirSimEnv):
         collision = False
         goal_reached = False
 
-        pt = [20, 0, 0]
         pt = [float(i) for i in self.drone.simGetObjectPose(AirSimLeader2DEnv.sim_target).position][:2]
-        print(pt)
 
         quad_pt = self.state["position"]/10
         old_quad_pt = self.state["prev_position"]/10
@@ -144,20 +151,21 @@ class AirSimLeader2DEnv(AirSimEnv):
             collision = True
         else:
             dist = np.sqrt((quad_pt[0]-pt[0])**2 + (quad_pt[1]-pt[1])**2)
-            quad_dist = np.sqrt((quad_pt[0]-old_quad_pt[0])**2 + (quad_pt[1]-old_quad_pt[1])**2)
-            if dist < 15:
+            old_dist = np.sqrt((old_quad_pt[0]-pt[0])**2 + (old_quad_pt[1]-pt[1])**2)
+            quad_dist = np.abs(dist - old_dist)
+            if dist < 20:
                 reward = 1000
                 goal_reached = True
             elif dist<=self.dist:
-                reward = 5+(5*quad_dist)
+                reward = (5+(5*quad_dist)) + (pt[0]-dist) 
             else:
-                reward =-( 5+ 5*quad_dist)
+                reward =-(5+ 5*quad_dist) + (pt[0]-dist)
         self.dist = dist
         if goal_reached or collision:
             print("env reset")
             done = True
             self.reset()
-            
+        reward = int(reward)
         print(reward, dist)
 
         return reward, done
