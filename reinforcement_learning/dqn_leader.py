@@ -6,7 +6,7 @@ import torch
 import torch.cuda
 import tensorflow as tf
 
-from stable_baselines3 import DQN, HerReplayBuffer
+from stable_baselines3 import DQN, HerReplayBuffer, SAC
 from sb3_contrib import QRDQN
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv, VecTransposeImage
@@ -31,35 +31,22 @@ def force_cudnn_initialization():
 force_cudnn_initialization()
 
 # Create a DummyVecEnv for main airsim gym env
-env = DummyVecEnv(
-    [
-        lambda: Monitor(
-            gym.make(
-                "airgym:airsim-drone-leader-v4",
+env =  gym.make(
+                "airgym:airsim-drone-leader-v3",
                 ip_address="127.0.0.1",
                 step_length=1.0,
                 image_shape=(84,84,1),
             )
-        )
-    ]
-)
+
+
 goal_selection_strategy = 'future'
 
-#check_env(env)
 
-# Wrap env as VecTransposeImage to allow SB to handle frame observations
-env = VecTransposeImage(env)
 
 # Initialize RL algorithm type and parameters
-model = DQN(
-    "MultiInputPolicy",
+model = SAC(
+    "MlpPolicy",
     env,
-    replay_buffer_class=HerReplayBuffer,
-    # Parameters for HER
-    replay_buffer_kwargs=dict(
-        n_sampled_goal=4,
-        goal_selection_strategy=goal_selection_strategy,
-    ),
     tensorboard_log="./tb_logs_new/",
     verbose=1,
 )
@@ -88,28 +75,28 @@ model = DQN(
 
 
 # Save a checkpoint every 1000 steps
-checkpoint_callback = CheckpointCallback(
-  save_freq=1000,
-  save_path="./logs_model/" + str(time.time()),
-  name_prefix="rl_model" + str(time.time()),
-  save_replay_buffer=True,
-  save_vecnormalize=True,
-)
+# checkpoint_callback = CheckpointCallback(
+#   save_freq=1000,
+#   save_path="./logs_model/" + str(time.time()),
+#   name_prefix="rl_model" + str(time.time()),
+#   save_replay_buffer=True,
+#   save_vecnormalize=True,
+# )
 
 # Create an evaluation callback with the same env, called every 10000 iterations
 eval_callback = EvalCallback(
     env,
-    n_eval_episodes=12,
-    best_model_save_path="." + str(time.time()),
-    log_path="." + str(time.time()),
+    n_eval_episodes=10,
+    best_model_save_path="bestmodel" + str(time.time()),
+    log_path="bestmodel" + str(time.time()),
     eval_freq=500,
     deterministic=False
 )
-callbacks = CallbackList([checkpoint_callback, eval_callback])
+callbacks = CallbackList([eval_callback])
 
 # Train for a certain number of timesteps
 model.learn(
-    total_timesteps=150000,
+    total_timesteps=10000,
     tb_log_name="dqn_airsim_leader_run_new_2" + str(time.time()),
     callback = callbacks,
     progress_bar=True

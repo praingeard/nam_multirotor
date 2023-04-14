@@ -15,6 +15,13 @@ import math
 STOP_SIGNAL = signal.SIGABRT
 START_SIGNAL = signal.SIGFPE
 
+def divide_chunks(l, n):
+    for i in range(0, len(l), n):
+        yield l[i:i + n]
+        
+def dist3(point1,point2):
+    return np.sqrt((point1[0]- point2[0])**2 + (point1[1]- point2[1])**2 + (point1[2]- point2[2])**2)
+
 class AirSimLeader2DHerEnv(AirSimGoalEnv):
     
     sim_target = "Goal_4" 
@@ -46,10 +53,12 @@ class AirSimLeader2DHerEnv(AirSimGoalEnv):
 
 
         self._action_space = spaces.Discrete(4)
-        self._obs_space = spaces.Dict({"observation": spaces.Box(0, 255, shape=image_shape, dtype=np.uint8), 
+        self._obs_space = spaces.Dict({"observation": spaces.Box(0.0, 50.0, shape=(4,), dtype=np.float32), 
                                       "desired_goal": spaces.Discrete(75), 
                                       "achieved_goal": spaces.Discrete(75)}, seed=0)
         self.reward_range = (-2000,2000)
+        distance_sensor_data = self.drone.getLidarData(vehicle_name = self.vehicle_name)
+        print(distance_sensor_data)
         self._setup_flight()
 
         self.image_request = airsim.ImageRequest(
@@ -68,6 +77,19 @@ class AirSimLeader2DHerEnv(AirSimGoalEnv):
 
     def __del__(self):
         self.drone.reset()
+        
+    def getLidarMin(self):        
+        distance_sensor_data = self.drone.getLidarData()
+        pointcloud = list(divide_chunks(distance_sensor_data.point_cloud,3))
+        min_dist = 75
+        for point_id in range(0,len(pointcloud)):
+            point=pointcloud[point_id]
+            dist = dist3(point, [0,0,0])
+            if dist < min_dist:
+                min_dist = dist 
+                min_point = point
+                obs = [point[0], point[1], point[2], min_dist]
+        return obs
 
     def _setup_flight(self):
         #also need to start MPC
@@ -105,8 +127,8 @@ class AirSimLeader2DHerEnv(AirSimGoalEnv):
         return arr
 
     def _get_obs(self):
-        responses = self.drone.simGetImages([self.image_request], vehicle_name=self.vehicle_name)
-        image = self.transform_obs(responses)
+        #responses = self.drone.simGetImages([self.image_request], vehicle_name=self.vehicle_name)
+        #image = self.transform_obs(responses)
         self.drone_state = self.drone.getMultirotorState(vehicle_name=self.vehicle_name)
         self.state["prev_position"] = self.state["position"]
         if all(v == 0 for v in self.state["prev_position"]):
@@ -114,9 +136,11 @@ class AirSimLeader2DHerEnv(AirSimGoalEnv):
         self.state["position"] =np.array([int(10*self.drone_state.kinematics_estimated.position.x_val), int(10*self.drone_state.kinematics_estimated.position.y_val)])
         collision = self.drone.simGetCollisionInfo(vehicle_name=self.vehicle_name).has_collided
         self.state["collision"] = collision
-        obs= {"observation" : image,
+        lidar = self.getLidarMin()
+        obs= {"observation" : lidar,
               "desired_goal" : self.desired_goal,
               "achieved_goal" : self.achieved_goal}
+        print(obs)
         return obs
 
     def _do_action(self, action):
