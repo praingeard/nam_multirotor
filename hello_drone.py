@@ -1,4 +1,4 @@
-import setup_path
+
 import airsim
 
 import numpy as np
@@ -32,6 +32,28 @@ state = client.getMultirotorState()
 # gps_data = client.getGpsData()
 # s = pprint.pformat(gps_data)
 # print("gps_data: %s" % s)
+
+def divide_chunks(l, n):
+    for i in range(0, len(l), n):
+        yield l[i:i + n]
+        
+def dist3(point1,point2):
+    return np.sqrt((point1[0]- point2[0])**2 + (point1[1]- point2[1])**2 + (point1[2]- point2[2])**2)
+ 
+
+distance_sensor_data = client.getLidarData()
+pointcloud = list(divide_chunks(distance_sensor_data.point_cloud,3))
+min_dist = 75
+for point_id in range(0,len(pointcloud)):
+    point=pointcloud[point_id]
+    dist = dist3(point, [0,0,0])
+    if dist < min_dist:
+        min_dist = dist 
+        min_point = point
+        
+print(min_point, min_dist)
+
+
 
 airsim.wait_key('Press any key to takeoff')
 print("Taking off...")
