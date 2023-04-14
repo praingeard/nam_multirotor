@@ -15,13 +15,6 @@ import math
 STOP_SIGNAL = signal.SIGABRT
 START_SIGNAL = signal.SIGFPE
 
-def divide_chunks(l, n):
-    for i in range(0, len(l), n):
-        yield l[i:i + n]
-        
-def dist3(point1,point2):
-    return np.sqrt((point1[0]- point2[0])**2 + (point1[1]- point2[1])**2 + (point1[2]- point2[2])**2)
-
 class AirSimLeader2DEnv(AirSimEnv):
     
     sim_target = "Goal_4" 
@@ -37,7 +30,7 @@ class AirSimLeader2DEnv(AirSimEnv):
         self.vehicle_name = "Leader"
         self.drone_names = ["Leader"]
         self.drone = airsim.MultirotorClient(ip=ip_address)
-        #self.drone_names = ["Drone1", "Drone2", "Drone3", "Leader"]
+        self.drone_names = ["Drone1", "Drone2", "Drone3", "Leader"]
         
         # Set detection radius in [cm]
         self.drone.simSetDetectionFilterRadius(AirSimLeader2DEnv.camera_name,  AirSimLeader2DEnv.image_type, 100 * 200)
@@ -52,7 +45,7 @@ class AirSimLeader2DEnv(AirSimEnv):
         }
 
 
-        self.observation_space = spaces.Box(0., 35., shape=(5,), dtype=np.float32)
+        self._obs_space = spaces.Box(0, 255, shape=image_shape, dtype=np.uint8)
         self._action_space = spaces.Box(-1., 1.,shape=(2,), dtype=np.float32)
         self.reward_range = (-2000,2000)
         self._setup_flight()
@@ -71,20 +64,37 @@ class AirSimLeader2DEnv(AirSimEnv):
 
     def __del__(self):
         self.drone.reset()
-        
-    def getLidarMin(self):        
-        obs = [0., 0., 0., 0., 0.]
-        distance_sensor_data = self.drone.getLidarData()
-        pointcloud = list(divide_chunks(distance_sensor_data.point_cloud,3))
-        min_dist = 75
-        for point_id in range(0,len(pointcloud)):
-            point=pointcloud[point_id]
-            dist = dist3(point, [0,0,0])
-            if dist < min_dist:
-                min_dist = dist 
-                obs = [point[0], point[1], point[2], min_dist, self.dist]
-        print(obs)
-        return obs
+
+    def get_mpc_pid(self):
+        # Define the directory where the log files are stored
+        log_directory = "./log_processes"
+        # Define the expected naming convention for the log files
+        file_name_pattern = "%Y-%m-%d_%H-%M-%S_*_log.txt"
+        # Get a list of all the log files in the log directory
+        log_files = [f for f in os.listdir(log_directory) if os.path.isfile(os.path.join(log_directory, f))]
+        # Filter out any files that do not match the expected naming convention
+        log_files = [f for f in log_files if datetime.datetime.strptime(f.split("_")[0], "%Y-%m-%d")]
+        # Sort the remaining files by their modification time, with the most recent file first
+        log_files.sort(key=lambda x: os.path.getmtime(os.path.join(log_directory, x)), reverse=True)
+        # Get the path to the most recent log file, if one exists
+        if log_files:
+            most_recent_log_file = os.path.join(log_directory, log_files[0])
+        else:
+            most_recent_log_file = None
+        print(f"Most recent log file: {most_recent_log_file}")
+        with open(most_recent_log_file, "r") as log_file:
+            log_contents = log_file.read()
+            pid2 = int(log_contents.split("\n")[1].split(":")[1])
+        print(f"PID of mpc_process: {pid2}")
+        return pid2
+    
+    def send_start_signal(self, mpc_pid):
+        os.kill(mpc_pid, START_SIGNAL)
+        print("started mpc control")
+
+    def send_stop_signal(self, mpc_pid):
+        os.kill(mpc_pid, STOP_SIGNAL)
+        print("stopped mpc control")
 
     def _setup_flight(self):
         #also need to start MPC
@@ -122,17 +132,21 @@ class AirSimLeader2DEnv(AirSimEnv):
         return arr
 
     def _get_obs(self):
-        #responses = self.drone.simGetImages([self.image_request], vehicle_name=self.vehicle_name)
-        #image = self.transform_obs(responses)
+        responses = self.drone.simGetImages([self.image_request], vehicle_name=self.vehicle_name)
+        image = self.transform_obs(responses)
         self.drone_state = self.drone.getMultirotorState(vehicle_name=self.vehicle_name)
         self.state["prev_position"] = self.state["position"]
         if all(v == 0 for v in self.state["prev_position"]):
             self.state["prev_position"] = np.array([int(10*self.drone_state.kinematics_estimated.position.x_val), int(10*self.drone_state.kinematics_estimated.position.y_val)])
         self.state["position"] =np.array([int(10*self.drone_state.kinematics_estimated.position.x_val), int(10*self.drone_state.kinematics_estimated.position.y_val)])
         collision = self.drone.simGetCollisionInfo(vehicle_name=self.vehicle_name).has_collided
+        collision = False
+        for drone_name in self.drone_names:
+           collision_current = self.drone.simGetCollisionInfo(vehicle_name=drone_name).has_collided
+           if collision_current == True:
+                collision = True
         self.state["collision"] = collision
-        lidar = self.getLidarMin()
-        return lidar
+        return image
 
     def _do_action(self, action):
         self.action_num += 1
@@ -166,21 +180,20 @@ class AirSimLeader2DEnv(AirSimEnv):
         quad_pt = self.state["position"]/10
         old_quad_pt = self.state["prev_position"]/10
         print(quad_pt,old_quad_pt)
-
+        dist = np.sqrt((quad_pt[0]-pt[0])**2 + (quad_pt[1]-pt[1])**2)
         if self.state["collision"]:
             reward = -1000
             collision = True
         else:
-            dist = np.sqrt((quad_pt[0]-pt[0])**2 + (quad_pt[1]-pt[1])**2)
             old_dist = np.sqrt((old_quad_pt[0]-pt[0])**2 + (old_quad_pt[1]-pt[1])**2)
             quad_dist = np.abs(dist - old_dist)
             if dist < 20:
                 reward = 1000
                 goal_reached = True
             elif dist<=self.dist:
-                reward = 10
+                reward = (5+(5*quad_dist)) + (pt[0]-dist) 
             else:
-                reward =-10
+                reward =-(5+ 5*quad_dist) + (pt[0]-dist)
         self.dist = dist
         if goal_reached or collision:
             print("env reset")
@@ -233,3 +246,10 @@ class AirSimLeader2DEnv(AirSimEnv):
         Return Gym's action space.
         """
         return self._action_space
+    
+    @property
+    def observation_space(self) -> spaces.Box:
+        """
+        Return Gym's action space.
+        """
+        return self._obs_space

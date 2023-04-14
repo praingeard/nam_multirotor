@@ -1,7 +1,7 @@
 import airsim
 import numpy as np
 import signal
-from pysigset import sigaddset
+#from pysigset import sigaddset
 
 
 STOP_SIGNAL = signal.SIGABRT
@@ -69,8 +69,8 @@ signal.signal(STOP_SIGNAL, handle_stop_signal)
 signal.signal(START_SIGNAL, handle_start_signal)
 signals = {START_SIGNAL, STOP_SIGNAL}
 # Block the signals so that they can be waited for with sigwaitinfo
-for sig in signals:
-    sigaddset(signal.SIG_BLOCK, sig)
+# for sig in signals:
+#     sigaddset(signal.SIG_BLOCK, sig)
 
 
 
@@ -122,8 +122,8 @@ def get_states_with_diff(drone_id):
 	rix_diff = [0, 0, 0, 0]
 	riy_diff = [0, 0, 0, 0]
 	riz_diff = [0, 0]
-	print("rix is", rix)
-	print("riy is", riy)
+	#print("rix is", rix)
+	#print("riy is", riy)
 	for i in  range (4):
 		rix_diff[i] = drone_init_state_xy[drone_id][i] + rix[i] - relative_state_xy[drone_id][i]
 		riy_diff[i] = drone_init_state_xy[drone_id][i + 4] + riy[i] - relative_state_xy[drone_id][i + 4]
@@ -131,8 +131,8 @@ def get_states_with_diff(drone_id):
 		riz_diff[i] = riz[i] - relative_state_z[drone_id][i]
 
 
-	print("states with diff for drone", drone_id)
-	print(rix_diff)
+	#print("states with diff for drone", drone_id)
+	#print(rix_diff)
 		
 	return rix_diff, riy_diff, riz_diff
 
@@ -174,7 +174,7 @@ while(timestep <= timestep_max):
 	if controller_started == False:
 		print("Waiting for signal to start")
 		siginfo = signal.sigwaitinfo({START_SIGNAL})
-	print('mpc started')
+	#print('mpc started')
 	#relative_state_xy, relative_state_z = get_current_relative_states(relative_state_xy, relative_state_z)
 	timestep = timestep + timestep_rate
 	iteration = iteration +1
@@ -191,12 +191,12 @@ while(timestep <= timestep_max):
 			rjx_hat, rjy_hat, rjz_hat = get_states_with_diff(j)
 			Mxi = Mxi - A_matrix[drone_id][j]*(beta_gains[0]*(riy_hat[0] - rjy_hat[0]) + beta_gains[1]*(riy_hat[1] - rjy_hat[1]) + 
 														    beta_gains[2] *(rix_hat[2] - rjx_hat[2]) + beta_gains[3] * (rix_hat[3] - rjx_hat[3]))
-			print("Mx for drone", drone_id, "and j ", j, " is ", Mxi)
+			#print("Mx for drone", drone_id, "and j ", j, " is ", Mxi)
 			Myi = Myi - A_matrix[drone_id][j]*(beta_gains[0]*(rix_hat[0] - rjx_hat[0]) + beta_gains[1]*(rix_hat[1] - rjx_hat[1]) + 
 														    beta_gains[2] *(riy_hat[2] - rjy_hat[2]) + beta_gains[3] * (riy_hat[3] - rjy_hat[3]))
 			Ti = Ti + A_matrix[drone_id][j]*(gamma_gains[0]*(riz_hat[0] - rjz_hat[0]) + gamma_gains[1]*(riz_hat[1] - rjz_hat[1]))
 		pwm = moments_to_pwm(Mxi,Myi,Ti)
-		print(pwm[0], pwm[1], pwm[2], pwm[3])
+		#print(pwm[0], pwm[1], pwm[2], pwm[3])
 		f1 = client.moveByMotorPWMsAsync(pwm[0], pwm[1], pwm[2], pwm[3], timestep_rate/2, drone_names[drone_id])
 		drone_commands.append(f1)
 	rx_leader, ry_leader, rz_leader = get_leader_state(0)
