@@ -102,8 +102,13 @@ class AirSimLeader2DEnv(AirSimEnv):
         for drone in self.drone_names:
             self.drone.enableApiControl(True, vehicle_name=drone)
             self.drone.armDisarm(True, vehicle_name=drone)
+
             
-        self.drone.moveToPositionAsync(0, 0, -3, 10).join()
+        #self.drone.moveToPositionAsync(0, 0, -3, 10, vehicle_name="Leader").join()
+        # self.drone.moveToPositionAsync(-2, -2, -3, 10, vehicle_name="Drone1").join()
+        # self.drone.moveToPositionAsync(-2, 0, -3, 10, vehicle_name="Drone2").join()
+        # self.drone.moveToPositionAsync(-2, 2, -3, 10, vehicle_name="Drone3").join()
+
 
         # Set home position and velocity
         self.drone.moveByVelocityAsync(1, 0, 0, 0.5, vehicle_name="Leader").join()
@@ -119,20 +124,39 @@ class AirSimLeader2DEnv(AirSimEnv):
         return info
 
     def transform_obs(self, responses):
+        images = []
         self.frame_num += 1
-        img1d = np.array(responses[0].image_data_float, dtype=float)
-        img1d = 255 / np.maximum(np.ones(img1d.size), img1d)
-        if img1d.size != 36864:
-            img1d = np.zeros(36864)
-            print("Error in the image gotten")
-        img2d = np.reshape(img1d, self.image_show_size)
-        self.last_image = Image.fromarray(img2d)
+        for response_drone in responses:
+            img1d = np.array(response_drone[0].image_data_float, dtype=float)
+            img1d = 255 / np.maximum(np.ones(img1d.size), img1d)
+            if img1d.size != 36864:
+                img1d = np.zeros(36864)
+                print("Error in the image gotten")
+            img2d = np.reshape(img1d, self.image_show_size)
+            image_depth = Image.fromarray(img2d)
+            images.append(image_depth)
+        images_vect = images
+        widths, heights = zip(*(i.size for i in images_vect))
+
+        total_width = sum(widths)
+        max_height = max(heights)
+
+        new_im = Image.new('L', (total_width, max_height))
+        
+
+        x_offset = 0
+        for im in images:
+            new_im.paste(im, (x_offset,0))
+            x_offset += im.size[0]
+        self.last_image = new_im
         im_final = np.array(self.last_image.resize((84, 84)).convert("L"))
         arr = im_final.reshape([84, 84, 1])
         return arr
 
     def _get_obs(self):
-        responses = self.drone.simGetImages([self.image_request], vehicle_name=self.vehicle_name)
+        responses = []
+        for namer in self.drone_names:
+            responses.append(self.drone.simGetImages([self.image_request], vehicle_name=self.vehicle_name))
         image = self.transform_obs(responses)
         self.drone_state = self.drone.getMultirotorState(vehicle_name=self.vehicle_name)
         self.state["prev_position"] = self.state["position"]
@@ -176,6 +200,7 @@ class AirSimLeader2DEnv(AirSimEnv):
         goal_reached = False
 
         pt = [float(i) for i in self.drone.simGetObjectPose(AirSimLeader2DEnv.sim_target).position][:2]
+        pt = [30,0,0]
 
         quad_pt = self.state["position"]/10
         old_quad_pt = self.state["prev_position"]/10
@@ -195,7 +220,7 @@ class AirSimLeader2DEnv(AirSimEnv):
             else:
                 reward =-(5+ 5*quad_dist) + (pt[0]-dist)
         self.dist = dist
-        if goal_reached or collision:
+        if goal_reached or collision or self.time >=20:
             print("env reset")
             done = True
             self.reset()

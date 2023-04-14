@@ -58,7 +58,7 @@ A_matrix = [[0, 1, 1, 0],[1, 0, 1, 1],[1, 1, 0, 0],[0, 0, 0, 0]]
 #state in x,y is [x,y, u, v, g*theta, g*phi, gq, gp]
 drone_init_state_xy = [[0, 0, 0, 0, -2, 0, 0, 0], [2, 0, 0, 0, 0, 0, 0, 0],[0, 0, 0, 0, 2, 0, 0, 0],[4, 0, 0, 0, 0, 0, 0, 0]]
 #state in z is z,w
-drone_init_state_z = [[-2, 0],[-2, 0],[-2, 0],[-2, 0]]
+drone_init_state_z = [[0, 0],[0, 0],[0, 0],[2, 0]]
 relative_state_xy = [[],[],[]]
 relative_state_z = [[],[],[]]
 

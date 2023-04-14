@@ -1,2 +1,0 @@
-PID of rl_process: 1754
-PID of mpc_process: 1755

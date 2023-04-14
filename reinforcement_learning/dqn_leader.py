@@ -15,20 +15,20 @@ from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback,
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.vec_env import VecFrameStack
 
-# try:
-#     tf_gpus = tf.config.list_physical_devices('GPU')
-#     for gpu in tf_gpus:
-#         tf.config.experimental.set_memory_growth(gpu, True)
-# except:
-#     pass 
+try:
+    tf_gpus = tf.config.list_physical_devices('GPU')
+    for gpu in tf_gpus:
+        tf.config.experimental.set_memory_growth(gpu, True)
+except:
+    pass 
 
 
-# def force_cudnn_initialization():
-#     s = 32
-#     dev = torch.device('cuda')
-#     torch.nn.functional.conv2d(torch.zeros(s, s, s, s, device=dev), torch.zeros(s, s, s, s, device=dev))
+def force_cudnn_initialization():
+    s = 32
+    dev = torch.device('cuda')
+    torch.nn.functional.conv2d(torch.zeros(s, s, s, s, device=dev), torch.zeros(s, s, s, s, device=dev))
     
-# force_cudnn_initialization()
+force_cudnn_initialization()
 
 # Create a DummyVecEnv for main airsim gym env
 # env =  gym.make(
@@ -63,7 +63,6 @@ env = VecTransposeImage(env)
 model = SAC(
     "CnnPolicy",
     env,
-    buffer_size=200000,
     tensorboard_log="./tb_logs_tests/",
     verbose=1,
 )
