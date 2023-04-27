@@ -200,7 +200,6 @@ class AirSimLeader2DEnv(AirSimEnv):
         goal_reached = False
 
         pt = [float(i) for i in self.drone.simGetObjectPose(AirSimLeader2DEnv.sim_target).position][:2]
-        pt = [30,0,0]
 
         quad_pt = self.state["position"]/10
         old_quad_pt = self.state["prev_position"]/10
@@ -211,6 +210,8 @@ class AirSimLeader2DEnv(AirSimEnv):
             collision = True
         else:
             old_dist = np.sqrt((old_quad_pt[0]-pt[0])**2 + (old_quad_pt[1]-pt[1])**2)
+            if abs(old_dist - dist) <= 0.05 and self.time > 5:
+                collision = True
             quad_dist = np.abs(dist - old_dist)
             if dist < 20:
                 reward = 1000
@@ -220,7 +221,7 @@ class AirSimLeader2DEnv(AirSimEnv):
             else:
                 reward =-(5+ 5*quad_dist) + (pt[0]-dist)
         self.dist = dist
-        if goal_reached or collision or self.time >=20:
+        if goal_reached or collision:
             print("env reset")
             done = True
             self.reset()

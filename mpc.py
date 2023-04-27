@@ -56,7 +56,7 @@ timestep_rate = 0.1
 L_matrix = [[3, -1, -1, -1],[-1, 3, -1, -1],[-1, -1, 3, -1],[0, 0, 0, 0]]
 A_matrix = [[0, 1, 1, 0],[1, 0, 1, 1],[1, 1, 0, 0],[0, 0, 0, 0]]
 #state in x,y is [x,y, u, v, g*theta, g*phi, gq, gp]
-drone_init_state_xy = [[0, 0, 0, 0, -2, 0, 0, 0], [2, 0, 0, 0, 0, 0, 0, 0],[0, 0, 0, 0, 2, 0, 0, 0],[4, 0, 0, 0, 0, 0, 0, 0]]
+drone_init_state_xy = [[0, 0, 0, 0, -1, 0, 0, 0], [2, 0, 0, 0, 0, 0, 0, 0],[0, 0, 0, 0, 1, 0, 0, 0],[4, 0, 0, 0, 0, 0, 0, 0]]
 #state in z is z,w
 drone_init_state_z = [[0, 0],[0, 0],[0, 0],[2, 0]]
 relative_state_xy = [[],[],[]]
@@ -163,7 +163,7 @@ for leader in leader_names:
 #MPC controller for current step
 timestep = 0
 iteration = 0
-while(timestep <= timestep_max):
+while True:
 	#wait for command for setup ended
 	if controller_reset == True:
 		print('controller asked reset')

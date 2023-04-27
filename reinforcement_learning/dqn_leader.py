@@ -63,7 +63,7 @@ env = VecTransposeImage(env)
 model = SAC(
     "CnnPolicy",
     env,
-    tensorboard_log="./tb_logs_tests/",
+    tensorboard_log="./tb_logs_test/",
     verbose=1,
 )
 
@@ -90,21 +90,21 @@ model = SAC(
 
 
 
-# Save a checkpoint every 1000 steps
-# checkpoint_callback = CheckpointCallback(
-#   save_freq=1000,
-#   save_path="./logs_model/" + str(time.time()),
-#   name_prefix="rl_model" + str(time.time()),
-#   save_replay_buffer=True,
-#   save_vecnormalize=True,
-# )
+#Save a checkpoint every 1000 steps
+checkpoint_callback = CheckpointCallback(
+  save_freq=1000,
+  save_path="./logs_model/" + str(time.time()),
+  name_prefix="rl_model_mpc" + str(time.time()),
+  save_replay_buffer=True,
+  save_vecnormalize=True,
+)
 
 # Create an evaluation callback with the same env, called every 10000 iterations
 eval_callback = EvalCallback(
     env,
     n_eval_episodes=10,
-    best_model_save_path="bestmodel" + str(time.time()),
-    log_path="bestmodel" + str(time.time()),
+    best_model_save_path="bestmodel_sacmpc" + str(time.time()),
+    log_path="bestmodel_sacmpc" + str(time.time()),
     eval_freq=500,
     deterministic=False
 )
@@ -112,11 +112,11 @@ callbacks = CallbackList([eval_callback])
 
 # Train for a certain number of timesteps
 model.learn(
-    total_timesteps=10000,
-    tb_log_name="dqn_airsim_leader_run_new_2" + str(time.time()),
+    total_timesteps=100000,
+    tb_log_name="dqn_airsim_leader_run_new_mpc" + str(time.time()),
     callback = callbacks,
     progress_bar=True
 )
 
 # Save policy weights
-model.save("dqn_airsim_leader_policy_new_2")
+model.save("dqn_airsim_leader_policy_new_mpc")
