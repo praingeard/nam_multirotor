@@ -1,4 +1,0 @@
-PID of rl_process: 33943
-PID of mpc_process: 33944
-rl_process return code: None
-mpc_process return code: None
