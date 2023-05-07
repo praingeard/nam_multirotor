@@ -3,12 +3,12 @@ import datetime
 import os
 
 # Define the paths to the two Python files you want to start
-file1_path = "./reinforcement_learning/dqn_leader.py"
+file1_path = "./reinforcement_learning/dqn_run.py"
 file2_path = "./mpc.py"
 
 # Start the two files simultaneously using the subprocess module and get their PIDs
-rl_process = subprocess.Popen(["python", file1_path])
-mpc_process = subprocess.Popen(["python", file2_path])
+rl_process = subprocess.Popen(["python3", file1_path])
+mpc_process = subprocess.Popen(["python3", file2_path])
 
 # Retrieve the PIDs of the two subprocesses
 rl_pid = rl_process.pid

@@ -1,5 +1,6 @@
 
 import airsim
+from PIL import Image
 
 import numpy as np
 import os
@@ -33,27 +34,38 @@ state = client.getMultirotorState()
 # s = pprint.pformat(gps_data)
 # print("gps_data: %s" % s)
 
-def divide_chunks(l, n):
-    for i in range(0, len(l), n):
-        yield l[i:i + n]
-        
-def dist3(point1,point2):
-    return np.sqrt((point1[0]- point2[0])**2 + (point1[1]- point2[1])**2 + (point1[2]- point2[2])**2)
- 
+drone_names = ["Drone1", "Drone2", "Drone3", "Leader"]
+images = []
 
-distance_sensor_data = client.getLidarData()
-pointcloud = list(divide_chunks(distance_sensor_data.point_cloud,3))
-min_dist = 75
-for point_id in range(0,len(pointcloud)):
-    point=pointcloud[point_id]
-    dist = dist3(point, [0,0,0])
-    if dist < min_dist:
-        min_dist = dist 
-        min_point = point
-        
-print(min_point, min_dist)
+for name in drone_names:
+    image_show_size = (144, 256)
+    image_request = airsim.ImageRequest(
+                0, airsim.ImageType.DepthPerspective, True, False
+            )
+    responses = client.simGetImages([image_request], vehicle_name=name)
+    img1d = np.array(responses[0].image_data_float, dtype=float)
+    img1d = 255 / np.maximum(np.ones(img1d.size), img1d)
+    img2d = np.reshape(img1d, image_show_size)
+    last_image = Image.fromarray(img2d)    
+    images.append(last_image)
 
 
+
+
+images_vect = images
+widths, heights = zip(*(i.size for i in images_vect))
+
+total_width = sum(widths)
+max_height = max(heights)
+
+new_im = Image.new('L', (total_width, max_height))
+
+x_offset = 0
+for im in images:
+  new_im.paste(im, (x_offset,0))
+  x_offset += im.size[0]
+
+new_im.show()
 
 airsim.wait_key('Press any key to takeoff')
 print("Taking off...")
