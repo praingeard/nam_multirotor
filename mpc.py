@@ -2,6 +2,8 @@ import airsim
 import numpy as np
 import signal
 from random import uniform
+import configparser
+
 #from pysigset import sigaddset
 
 
@@ -142,8 +144,36 @@ def get_states_with_diff(drone_init_state_xy, drone_id, rel_state_xy, rel_state_
 		
 	return rix_diff, riy_diff, riz_diff
 
+def change_controller_gains():
+    config = configparser.ConfigParser()
+    config.read('config.ini')
+    V = float(config['DEFAULT']['V'])
+    
+    betaval = [[0.0,2.8],[0.0,],[0.0,],[0.0,]]
+    gammaval = [[0.0,],[0.0,]]
+    new_beta_gains_x = []
+    new_beta_gains_y = []
+    new_gamma_gains = []
+    for beta in betaval:
+        new_beta_gains_x.append(compute_new_gain(beta, V))
+        new_beta_gains_y.append(compute_new_gain(beta, V))
+    for gamma in gammaval:
+        new_gamma_gains.append(compute_new_gain(gamma, V))
+    return new_beta_gains_x,new_beta_gains_y,new_gamma_gains
 
+def compute_new_gain(gainlist, v):
+    if len(gainlist != 3):
+        print("Error: gainlist not correctly defined")
+    gainmin = gainlist[0]
+    gainmax = gainlist[1]
+    alpha = 3*gainmax
+    beta = gainmin
+    new_gain = alpha*q_approx(v) + beta
+    return new_gain
 
+def q_approx(x):
+    poly = 1/12*np.exp(-x**2/2) + 1/4*np.exp(-2*x**2/3)
+    return poly
 
 #initial setup 
 drone_num = 3
@@ -208,10 +238,17 @@ timestep = 0
 iteration = 0
 change = False
 while(timestep <= timestep_max):
-	if iteration%30 == 0:
-		delta = uniform(0, 1)
+    # Read the current value of delta from a configuration file
+	config = configparser.ConfigParser()
+	config.read('config.ini')
+	delta = float(config['DEFAULT']['delta'])
+	controller_rate = int(config['DEFAULT']['controller_rate'])
+
+	if iteration%controller_rate == 0:
 		print("delta", delta)
 		(relative_state_xy, relative_state_z) = set_relative_states_delta(delta, lenlist, widthlist)
+		# (beta_gains_x, beta_gains_y, gamma_gains) = change_controller_gains()
+		# print('new gains are' + beta_gains_x, gamma_gains)
 	#wait for command for setup ended
 	if controller_reset == True:
 		print('controller asked reset')
