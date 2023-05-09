@@ -26,12 +26,15 @@ def thrust_to_pwm(thrust):
 	air_density_ratio = air_density / standard_air_density
 	pwm = np.zeros(4)
 	for i in range(thrust.size):
-		pwm[i] = max(0.0, min(1.0,0.594 + thrust[i] / (air_density_ratio * max_thrust)))
+		#pwm[i] = max(0.0, min(1.0,0.594 + thrust[i] / (air_density_ratio * max_thrust)))
+		pwm[i] = max(0.0, min(1.0,0.594 + thrust[i] / max_thrust))
 	return pwm
 
 def moments_to_pwm(Mx,My,T):
-	Mx = Mx/1000
-	My = My/1000
+	max_torque = 0.055
+	#print(Mx)
+	Mx = np.sign(Mx) * min(np.abs(Mx/286), max_torque)
+	My = np.sign(My) * min(np.abs(My/275.39), max_torque)
 	k = 0.0000155
 	l = 0.2275
 	w1sq = (T/(4*k)) + (Mx/(4*k*l)) + (My/(4*k*l)) 
@@ -151,11 +154,11 @@ drone_names = ["Drone1", "Drone2", "Drone3"]
 leader_names = ["Leader"]
 g = 9.81
 timestep_max = 300.0
-timestep_rate = 0.1
+timestep_rate = 0.001
 lenlist = (4, 8)
 widthlist = (0, 4)
 L_matrix = [[2, -1, -1, 0],[-1, 2, -1, -1],[-1, -1, 2, 0],[0, 0, 0, 0]]
-A_matrix = [[0, 1, 1, 0],[1, 0, 1, 1],[1, 1, 0, 0],[0, 0, 0, 0]]
+A_matrix = [[0, 1, 1, 0],[0, 1, 1, 1],[0, 1, 1, 0],[0, 0, 0, 0]]
 (init_state_xy, init_state_z, relative_state_xy, relative_state_z) = set_init_state(lenlist, widthlist)
 
 #signal handling
@@ -171,8 +174,8 @@ signals = {START_SIGNAL, STOP_SIGNAL}
 #setup gains 
 #beta_gains = [-5, -1, 0.3, 0]
 #beta_gains = [-2.5,-3.9,0,0]
-beta_gains_x = [-1,-3.1,15,3]
-beta_gains_y = [-1, -3.1, 15, 3]
+beta_gains_x = [-3,-5, 15, 3]
+beta_gains_y = [-3,-5, 15, 3]
 gamma_gains = [2.9, 3.9]
 
 
@@ -208,10 +211,11 @@ timestep = 0
 iteration = 0
 change = False
 while(timestep <= timestep_max):
-	if iteration%30 == 0:
+	if iteration%30 == 0 and change == False:
 		delta = uniform(0, 1)
 		print("delta", delta)
 		(relative_state_xy, relative_state_z) = set_relative_states_delta(delta, lenlist, widthlist)
+		change = True
 	#wait for command for setup ended
 	if controller_reset == True:
 		print('controller asked reset')
@@ -235,6 +239,8 @@ while(timestep <= timestep_max):
 		Myi = 0
 		Ti = 0
 		rix_hat, riy_hat, riz_hat = get_states_with_diff(init_state_xy, drone_id, relative_state_xy, relative_state_z)
+		j_list_speed = []
+		speed_amount = 0
 		for j in range(drone_num+1):
 			rjx_hat, rjy_hat, rjz_hat = get_states_with_diff(init_state_xy, j, relative_state_xy, relative_state_z)
 			Mxi = Mxi - A_matrix[drone_id][j]*(beta_gains_x[0]*(riy_hat[0] - rjy_hat[0]) + beta_gains_x[1]*(riy_hat[1] - rjy_hat[1]) + 
@@ -243,12 +249,18 @@ while(timestep <= timestep_max):
 			Myi = Myi - A_matrix[drone_id][j]*(beta_gains_y[0]*(rix_hat[0] - rjx_hat[0]) + beta_gains_y[1]*(rix_hat[1] - rjx_hat[1]) + 
 														    beta_gains_y[2] *(riy_hat[2] - rjy_hat[2]) + beta_gains_y[3] * (riy_hat[3] - rjy_hat[3]))
 			Ti = Ti + A_matrix[drone_id][j]*(gamma_gains[0]*(riz_hat[0] - rjz_hat[0]) + gamma_gains[1]*(riz_hat[1] - rjz_hat[1]))
+			if iteration % 5 == 0:
+				j_list_speed.append(riy_hat[1] - rjy_hat[1])
+				speed_amount+=(A_matrix[drone_id][j]* beta_gains_x[1] * (riy_hat[1] - rjy_hat[1]))
 		pwm = moments_to_pwm(Mxi,Myi,Ti)
 		#print(pwm[0], pwm[1], pwm[2], pwm[3])
-		f1 = client.moveByMotorPWMsAsync(pwm[0], pwm[1], pwm[2], pwm[3], timestep_rate/2, drone_names[drone_id])
+		f1 = client.moveByMotorPWMsAsync(pwm[0], pwm[1], pwm[2], pwm[3], timestep_rate/30, drone_names[drone_id])
 		drone_commands.append(f1)
+		if iteration % 5 == 0 and drone_id == 0:
+			print("gains",j_list_speed)
+			print("speed amount", speed_amount)
 	rx_leader, ry_leader, rz_leader = get_leader_state(0)
-	f_leader = client.moveByMotorPWMsAsync(0.594, 0.594, 0.594, 0.594, timestep_rate/2, vehicle_name="Leader")
+	f_leader = client.moveByMotorPWMsAsync(0.594, 0.594, 0.594, 0.594, timestep_rate/30, vehicle_name="Leader")
 	#f_leader = client.moveByRollPitchYawZAsync(0.0, 0.05, 0, rz_leader[0]-0.2, timestep_rate/2, vehicle_name="Leader")
 	drone_commands.append(f_leader)
 	for f in drone_commands:
