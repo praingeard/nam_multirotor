@@ -12,8 +12,8 @@ gamma_0 = Symbol('gamma_0')
 gamma_1 = Symbol('gamma_1')
 
 beta_0 = 1
-beta_1 = 3.1
-beta_2 = 15
+beta_1 = 100
+beta_2 = 20
 beta_3 = 3
 lambda_R = 3
 lambda_I = 0
@@ -31,7 +31,7 @@ equation5 = delta_1*(delta_1*(delta_3*lambda_I**2 + beta_3**2*lambda_R**3) - bet
 
 equation1_2 = (gamma_1**2*lambda_R - gamma_0) * lambda_I**2 + gamma_1**2*lambda_R**3
 
-print(reduce_inequalities([equation5 > 0],[beta_0]))
+print(reduce_inequalities([equation1 > 0],[beta_0]))
 
 # beta_0 = 2
 # beta_1 = 1
