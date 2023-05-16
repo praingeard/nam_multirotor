@@ -6,10 +6,10 @@ import torch
 import torch.cuda
 import tensorflow as tf
 
-from stable_baselines3 import DQN, HerReplayBuffer, SAC
+from stable_baselines3 import DQN, HerReplayBuffer, SAC, PPO
 #from sb3_contrib import QRDQN
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.vec_env import DummyVecEnv, VecTransposeImage
+from stable_baselines3.common.vec_env import SubprocVecEnv, VecTransposeImage
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback, CallbackList
 from stable_baselines3.common.env_checker import check_env
@@ -38,17 +38,45 @@ from stable_baselines3.common.vec_env import VecFrameStack
 #                 image_shape=(84,84,1),
 #             )
 
-
 goal_selection_strategy = 'future'
 
-env = DummyVecEnv(
+env = SubprocVecEnv(
     [
+        lambda: Monitor(
+            gym.make(
+                "airgym:airsim-drone-leader-v5",
+                ip_address="127.0.0.1",
+                step_length=1.0,
+                image_shape=(84,84,1),
+                drone_name="Drone1"
+            )
+        ),
         lambda: Monitor(
             gym.make(
                 "airgym:airsim-drone-leader-v3",
                 ip_address="127.0.0.1",
                 step_length=1.0,
                 image_shape=(84,84,1),
+                drone_name="Drone2"
+            )
+        ),
+        lambda: Monitor(
+            gym.make(
+                "airgym:airsim-drone-leader-v3",
+                ip_address="127.0.0.1",
+                step_length=1.0,
+                image_shape=(84,84,1),
+                drone_name="Drone3"
+            )
+        ),
+
+        lambda: Monitor(
+            gym.make(
+                "airgym:airsim-drone-leader-v3",
+                ip_address="127.0.0.1",
+                step_length=1.0,
+                image_shape=(84,84,1),
+                drone_name="Leader"
             )
         )
     ]
@@ -60,10 +88,10 @@ env = VecTransposeImage(env)
 
 
 # Initialize RL algorithm type and parameters
-model = SAC(
+model = PPO(
     "CnnPolicy",
     env,
-    tensorboard_log="./tb_logs_new/",
+    tensorboard_log="./tb_logs_test/",
     verbose=1,
 )
 
