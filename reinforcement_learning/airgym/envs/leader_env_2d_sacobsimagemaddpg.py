@@ -73,7 +73,8 @@ class AirSimLeader2DEnv(AirSimEnv):
 
     def _setup_flight(self):
         #also need to start MPC
-        self.drone.reset()
+        resetpose = airsim.types.Pose(position_val=[0.0,0.0,0.0], orientation_val=[0.0,0.0,0.0,0.0])
+        self.drone.simSetVehiclePose(resetpose, vehicle_name=self.vehicle_name)
         setups = []
         for drone in self.drone_names:
             self.drone_state = self.drone.getMultirotorState(vehicle_name=drone)

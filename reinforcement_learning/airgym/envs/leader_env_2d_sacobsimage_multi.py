@@ -5,6 +5,7 @@ import math
 from gym import spaces
 from airgym.envs.airsim_env import AirSimEnv
 from PIL import Image
+from airsim.types import Vector3r, Pose
 
 import signal
 import os
@@ -27,6 +28,7 @@ class AirSimLeader2DEnv(AirSimEnv):
         self.time = 0
         self.image_shape = image_shape
         self.dist = 75
+        print(drone_name)
         self.vehicle_name = drone_name
         self.drone_names = [drone_name]
         self.drone = airsim.MultirotorClient(ip=ip_address)
@@ -63,19 +65,20 @@ class AirSimLeader2DEnv(AirSimEnv):
         self.truncated = False
 
     def __del__(self):
-        self.drone.reset()
+        pose = Pose(position_val=Vector3r(0,0,0))
+        #self.drone.simSetVehiclePose(pose, ignore_collision=False, vehicle_name=self.vehicle_name)
 
     def _setup_flight(self):
-        #also need to start MPC
-        self.drone.reset()
+        #pose = Pose(position_val=Vector3r(0.0,0.0,-3))
+        #self.drone.simSetVehiclePose(pose, ignore_collision=True, vehicle_name=self.vehicle_name)
         for drone in self.drone_names:
             self.drone.enableApiControl(True, vehicle_name=drone)
             self.drone.armDisarm(True, vehicle_name=drone)
             
-        self.drone.moveToPositionAsync(0, 0, -3, 10).join()
+        #self.drone.moveToPositionAsync(0, 0, -3, 10, vehicle_name=self.vehicle_name).join()
 
         # Set home position and velocity
-        self.drone.moveByVelocityAsync(1, 0, 0, 0.5, vehicle_name="Leader").join()
+        #self.drone.moveByVelocityAsync(1, 0, 0, 0.5, vehicle_name=self.vehicle_name).join()
         
         
     def _get_info(self) -> Dict[str, Any]:
@@ -123,14 +126,19 @@ class AirSimLeader2DEnv(AirSimEnv):
         #     1,
         #     vehicle_name=self.vehicle_name
         # ).join()
+        for drone in self.drone_names:
+            self.drone.enableApiControl(True, vehicle_name=drone)
+            self.drone.armDisarm(True, vehicle_name=drone)
         quad_pos = self.drone.getMultirotorState(vehicle_name=self.vehicle_name).kinematics_estimated.position
         self.drone.moveToPositionAsync(
             quad_pos.x_val + quad_offset[0],
             quad_pos.y_val + quad_offset[1],
             -3,
-            1,
+            5,
             vehicle_name=self.vehicle_name
         ).join()
+        print( quad_pos.x_val + quad_offset[0],
+            quad_pos.y_val + quad_offset[1])
 
     def _compute_reward(self):
         dist = 75
@@ -139,11 +147,10 @@ class AirSimLeader2DEnv(AirSimEnv):
         collision = False
         goal_reached = False
 
-        pt = [float(i) for i in self.drone.simGetObjectPose(AirSimLeader2DHerEnv.sim_target).position][:2]
+        pt = [float(i) for i in self.drone.simGetObjectPose(AirSimLeader2DEnv.sim_target).position][:2]
 
         quad_pt = self.state["position"]/10
         old_quad_pt = self.state["prev_position"]/10
-        print(quad_pt,old_quad_pt)
         dist = np.sqrt((quad_pt[0]-pt[0])**2 + (quad_pt[1]-pt[1])**2)
         if self.state["collision"]:
             reward = -1000
@@ -162,9 +169,8 @@ class AirSimLeader2DEnv(AirSimEnv):
         if goal_reached or collision:
             print("env reset")
             done = True
-            self.reset()
         reward = int(reward)
-        print(reward, self.achieved_goal)
+        print(reward, dist)
 
         return reward, done
 

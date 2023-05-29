@@ -11,6 +11,7 @@ import os
 import datetime
 from typing import Dict, Any
 import math
+from airsim.types import Vector3r, Pose
 
 STOP_SIGNAL = signal.SIGABRT
 START_SIGNAL = signal.SIGFPE
@@ -21,14 +22,14 @@ class AirSimLeader2DEnv(AirSimEnv):
     camera_name = '0'
     image_type = airsim.ImageType.Scene
     
-    def __init__(self, ip_address, step_length, image_shape):
+    def __init__(self, ip_address, step_length, image_shape, drone_name):
         super(AirSimLeader2DEnv, self).__init__(image_shape)
         self.step_length = step_length
         self.time = 0
         self.image_shape = image_shape
         self.dist = 75
-        self.vehicle_name = "Leader"
-        self.drone_names = ["Leader"]
+        self.vehicle_name = drone_name
+        self.drone_names = [drone_name]
         self.drone = airsim.MultirotorClient(ip=ip_address)
         #self.drone_names = ["Drone1", "Drone2", "Drone3", "Leader"]
         
@@ -63,19 +64,20 @@ class AirSimLeader2DEnv(AirSimEnv):
         self.truncated = False
 
     def __del__(self):
-        self.drone.reset()
+        pose = Pose(position_val=Vector3r(0.0,0.0,-3))
+        self.drone.simSetVehiclePose(pose, ignore_collision=True, vehicle_name=self.vehicle_name)
 
     def _setup_flight(self):
         #also need to start MPC
-        self.drone.reset()
+        pose = Pose(position_val=Vector3r(0.0,0.0,0.0))
+        self.drone.simSetVehiclePose(pose, ignore_collision=True, vehicle_name=self.vehicle_name)
         for drone in self.drone_names:
             self.drone.enableApiControl(True, vehicle_name=drone)
             self.drone.armDisarm(True, vehicle_name=drone)
-            
-        self.drone.moveToPositionAsync(0, 0, -3, 10).join()
 
         # Set home position and velocity
-        self.drone.moveByVelocityAsync(1, 0, 0, 0.5, vehicle_name="Leader").join()
+        self.drone.moveByVelocityAsync(0, 0, 1, 3, vehicle_name=self.vehicle_name).join()
+        self.drone.moveByVelocityAsync(1, 0, 0, 0.5, vehicle_name=self.vehicle_name).join()
         
         
     def _get_info(self) -> Dict[str, Any]:
@@ -139,7 +141,7 @@ class AirSimLeader2DEnv(AirSimEnv):
         collision = False
         goal_reached = False
 
-        pt = [float(i) for i in self.drone.simGetObjectPose(AirSimLeader2DHerEnv.sim_target).position][:2]
+        pt = [float(i) for i in self.drone.simGetObjectPose(AirSimLeader2DEnv.sim_target).position][:2]
 
         quad_pt = self.state["position"]/10
         old_quad_pt = self.state["prev_position"]/10
@@ -164,7 +166,7 @@ class AirSimLeader2DEnv(AirSimEnv):
             done = True
             self.reset()
         reward = int(reward)
-        print(reward, self.achieved_goal)
+        print(reward, dist)
 
         return reward, done
 

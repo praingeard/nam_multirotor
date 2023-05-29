@@ -6,6 +6,8 @@ from gym import spaces
 from airgym.envs.airsim_env import AirSimEnv
 from PIL import Image
 
+import configparser
+
 import signal
 import os
 import datetime
@@ -14,6 +16,12 @@ import math
 
 STOP_SIGNAL = signal.SIGABRT
 START_SIGNAL = signal.SIGFPE
+
+def get_app_file_path(file):
+    """Return the absolute path of the app's files. They should be in the same folder as this py file."""
+    folder,_ = os.path.split(__file__)
+    file_path = os.path.join(folder,file)
+    return file_path
 
 class AirSimLeader2DEnv(AirSimEnv):
     
@@ -61,6 +69,20 @@ class AirSimLeader2DEnv(AirSimEnv):
         #init empty image of right size
         self.last_image = Image.fromarray(np.reshape(np.zeros(36864), self.image_show_size))
         self.truncated = False
+        self.config = configparser.ConfigParser()
+        self.config.read(get_app_file_path('config.ini'))
+
+        V = 1.2
+        delta = 0.0
+        controller_rate = 30
+
+
+        self.config['DEFAULT']['V'] = str(V)
+        self.config['DEFAULT']['delta'] = str(delta)
+        self.config['DEFAULT']['controller_rate'] = str(controller_rate)
+
+        with open('config.ini', 'w') as configfile:
+            self.config.write(configfile)
 
     def __del__(self):
         self.drone.reset()
@@ -198,6 +220,12 @@ class AirSimLeader2DEnv(AirSimEnv):
         done = False
         collision = False
         goal_reached = False
+        try:
+            self.config.read('config.ini')
+            delta = float(self.config['DEFAULT']['delta'])
+  
+        except KeyError as e:
+            print("error delta")
 
         pt = [float(i) for i in self.drone.simGetObjectPose(AirSimLeader2DEnv.sim_target).position][:2]
 
@@ -210,16 +238,17 @@ class AirSimLeader2DEnv(AirSimEnv):
             collision = True
         else:
             old_dist = np.sqrt((old_quad_pt[0]-pt[0])**2 + (old_quad_pt[1]-pt[1])**2)
-            if abs(old_dist - dist) <= 0.05 and self.time > 5:
-                collision = True
             quad_dist = np.abs(dist - old_dist)
-            if dist < 20:
+            if self.time > 30:
+                collision = True
+                reward = -1000
+            elif dist < 20:
                 reward = 1000
                 goal_reached = True
             elif dist<=self.dist:
-                reward = (5+(5*quad_dist)) + (pt[0]-dist) 
+                reward = (5+(5*quad_dist)) + (pt[0]-dist) - delta*0.1
             else:
-                reward =-(5+ 5*quad_dist) + (pt[0]-dist)
+                reward =-(5+ 5*quad_dist) + (pt[0]-dist) -delta*0.1
         self.dist = dist
         if goal_reached or collision:
             print("env reset")
@@ -249,10 +278,23 @@ class AirSimLeader2DEnv(AirSimEnv):
         }
         image = self._get_obs()
         self.dist = 75
+        V = 1.2
+        delta = 0.0
+
+
+        self.config['DEFAULT']['V'] = str(V)
+        self.config['DEFAULT']['delta'] = str(delta)
+
+        with open('config.ini', 'w') as configfile:
+            self.config.write(configfile)
         return  image
 
     def interpret_action(self, action):
         quad_offset = (action[0], action[1], 0)
+        delta = action[2]
+        self.config['DEFAULT']['delta'] = str(delta)
+        with open('config.ini', 'w') as configfile:
+            self.config.write(configfile)
         # offset = self.step_length
         # if action == 0:
         #     quad_offset = (offset, 0, 0)

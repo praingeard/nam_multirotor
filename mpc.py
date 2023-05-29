@@ -35,8 +35,8 @@ def thrust_to_pwm(thrust):
 def moments_to_pwm(Mx,My,T):
 	max_torque = 0.055
 	#print(Mx)
-	Mx = np.sign(Mx) * min(np.abs(Mx/286), max_torque)
-	My = np.sign(My) * min(np.abs(My/275.39), max_torque)
+	Mx = np.sign(Mx) * min(np.abs(Mx/100), max_torque)
+	My = np.sign(My) * min(np.abs(My/100), max_torque)
 	k = 0.0000155
 	l = 0.2275
 	w1sq = (T/(4*k)) + (Mx/(4*k*l)) + (My/(4*k*l)) 
@@ -63,7 +63,7 @@ def set_relative_states_delta(delta, lenlist, widthlist):
 	#state in x,y is [x,y, u, v, g*theta, g*phi, gq, gp]
 	current_state_xy = [[d1x, 0, 0, 0, d1y, 0, 0, 0],[d2x, 0, 0, 0, 0, 0, 0, 0],[d3x, 0, 0, 0, d3y, 0, 0, 0],[leaderx, 0, 0, 0, 0, 0, 0, 0]]
 	#state in z is z,w
-	current_state_z = [[-2,0],[-2,0],[-2,0],[-2,0]]
+	current_state_z = [[-4,0],[-4,0],[-4,0],[-2,0]]
 	(relative_state_xy, relative_state_z) = setup_relative_states(current_state_xy, current_state_z)
 	return relative_state_xy, relative_state_z
 
@@ -79,7 +79,7 @@ def set_init_state(lenlist, widthlist):
 	#state in x,y is [x,y, u, v, g*theta, g*phi, gq, gp]
 	init_state_xy = [[d1x, 0, 0, 0, d1y, 0, 0, 0],[d2x, 0, 0, 0, 0, 0, 0, 0],[d3x, 0, 0, 0, d3y, 0, 0, 0],[leaderx, 0, 0, 0, 0, 0, 0, 0]]
 	#state in z is z,w
-	init_state_z = [[-2,0],[-2,0],[-2,0],[-2,0]]
+	init_state_z = [[-4,0],[-4,0],[-4,0],[-2,0]]
 	(relative_state_xy, relative_state_z) = setup_relative_states(init_state_xy, init_state_z)
 	return init_state_xy, init_state_z, relative_state_xy, relative_state_z
 
@@ -200,10 +200,11 @@ signals = {START_SIGNAL, STOP_SIGNAL}
 #     sigaddset(signal.SIG_BLOCK, sig)
 
 #setup gains 
-#beta_gains = [-5, -1, 0.3, 0]
+beta_gains_x = [-5, -1, 0.3, 0.1]
+beta_gains_y = [-5, -1, 0.3, 0.1]
 #beta_gains = [-2.5,-3.9,0,0]
-beta_gains_x = [-3,-5, 15, 3]
-beta_gains_y = [-3,-5, 15, 3]
+# beta_gains_x = [-3,-5, 15, 3]
+# beta_gains_y = [-3,-5, 15, 3]
 gamma_gains = [2.9, 3.9]
 
 
@@ -238,17 +239,21 @@ for leader in leader_names:
 timestep = 0
 iteration = 0
 change = False
-while(timestep <= timestep_max):
+config = configparser.ConfigParser()
+while(True):
 	# Read the current value of delta from a configuration file
-	config = configparser.ConfigParser()
-	config.read('config.ini')
-	delta = float(config['DEFAULT']['delta'])
-	controller_rate = int(config['DEFAULT']['controller_rate'])
+	try:
+		config.read('config.ini')
+		delta = float(config['DEFAULT']['delta'])
+		controller_rate = int(config['DEFAULT']['controller_rate'])
+  
+	except KeyError as e:
+		continue
 
 	if iteration%controller_rate == 0:
 		#print("delta", delta)
-		#(relative_state_xy, relative_state_z) = set_relative_states_delta(delta, lenlist, widthlist)
-		(beta_gains_x, beta_gains_y, gamma_gains) = change_controller_gains()
+		(relative_state_xy, relative_state_z) = set_relative_states_delta(delta, lenlist, widthlist)
+		#(beta_gains_x, beta_gains_y, gamma_gains) = change_controller_gains()
 		#print(beta_gains_x, gamma_gains)
 		print('new gains are', beta_gains_x, gamma_gains)
 	#wait for command for setup ended

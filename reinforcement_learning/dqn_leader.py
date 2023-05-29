@@ -63,7 +63,7 @@ env = VecTransposeImage(env)
 model = SAC(
     "CnnPolicy",
     env,
-    tensorboard_log="./tb_logs_new/",
+    tensorboard_log="./tb_logs_new2/",
     verbose=1,
 )
 
