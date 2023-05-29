@@ -82,7 +82,7 @@ class AirSimLeader2DEnv(AirSimEnv):
             setups.append(self.drone.moveToPositionAsync(
                 self.drone_state.kinematics_estimated.position.x_val, 
                 self.drone_state.kinematics_estimated.position.y_val, 
-                -3, 10, vehicle_name=drone))
+                -2, 3, vehicle_name=drone))
         for setup in setups:
             setup.join()
         
@@ -118,8 +118,8 @@ class AirSimLeader2DEnv(AirSimEnv):
             self.drone_state = self.drone.getMultirotorState(vehicle_name=vehicle_name)
             self.state[drone_id]["prev_position"] = self.state[drone_id]["position"]
             if all(v == 0 for v in self.state[drone_id]["prev_position"]):
-                self.state[drone_id]["prev_position"] = np.array([int(10*self.drone_state.kinematics_estimated.position.x_val), int(10*self.drone_state.kinematics_estimated.position.y_val)])
-            self.state[drone_id]["position"] =np.array([int(10*self.drone_state.kinematics_estimated.position.x_val), int(10*self.drone_state.kinematics_estimated.position.y_val)])
+                self.state[drone_id]["prev_position"] = np.array([10*self.drone_state.kinematics_estimated.position.x_val, 10*self.drone_state.kinematics_estimated.position.y_val])
+            self.state[drone_id]["position"] =np.array([10*self.drone_state.kinematics_estimated.position.x_val, 10*self.drone_state.kinematics_estimated.position.y_val])
             collision = self.drone.simGetCollisionInfo(vehicle_name=vehicle_name).has_collided
             self.state[drone_id]["collision"] = collision
         return image_arr
@@ -130,7 +130,9 @@ class AirSimLeader2DEnv(AirSimEnv):
             self.action_num += 1
             drone = self.drone_names[drone_id]
             quad_offset = self.interpret_action(action[drone_id])
+            print(quad_offset)
             quad_pos = self.drone.getMultirotorState(vehicle_name=drone).kinematics_estimated.position
+            print(quad_pos)
             print(quad_pos.x_val + quad_offset[0], quad_pos.y_val + quad_offset[1])
             if (self.state[drone_id]["collision"] == False):
                 actions.append(self.drone.moveToPositionAsync(
@@ -161,10 +163,10 @@ class AirSimLeader2DEnv(AirSimEnv):
             print(quad_pt,old_quad_pt)
             dist = np.sqrt((quad_pt[0]-pt[0])**2 + (quad_pt[1]-pt[1])**2)
             old_dist = np.sqrt((old_quad_pt[0]-pt[0])**2 + (old_quad_pt[1]-pt[1])**2)
-            if abs(old_dist - dist) <= 0.05 and self.time > 5:
-                reward = -250
-                collision = True
-            elif self.state[drone_id]["collision"] and self.time > 1:
+            if abs(old_dist - dist) <= 0.03 and self.time > 5:
+               reward = -250
+               collision = True
+            if self.state[drone_id]["collision"] and self.time > 3:
                 reward = -250
                 collision = True
             else:
@@ -222,6 +224,7 @@ class AirSimLeader2DEnv(AirSimEnv):
         #quad_offset = (action[0], action[1], 0)
         action_current = np.argmax(action)
         offset = self.step_length
+        #print("current action", action_current, offset)
         if action_current == 0:
             quad_offset = (offset, 0, 0)
         elif action_current == 1:

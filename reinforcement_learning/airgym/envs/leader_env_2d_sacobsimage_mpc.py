@@ -175,22 +175,22 @@ class AirSimLeader2DEnv(AirSimEnv):
     def _do_action(self, action):
         self.action_num += 1
         quad_offset = self.interpret_action(action)
-        # quad_vel = self.drone.getMultirotorState(vehicle_name=self.vehicle_name).kinematics_estimated.linear_velocity
-        # self.drone.moveByVelocityAsync(
-        #     quad_vel.x_val + quad_offset[0],
-        #     quad_vel.y_val + quad_offset[1],
-        #     quad_vel.z_val + quad_offset[2],
-        #     1,
-        #     vehicle_name=self.vehicle_name
-        # ).join()
-        quad_pos = self.drone.getMultirotorState(vehicle_name=self.vehicle_name).kinematics_estimated.position
-        self.drone.moveToPositionAsync(
-            quad_pos.x_val + quad_offset[0],
-            quad_pos.y_val + quad_offset[1],
-            -3,
+        quad_vel = self.drone.getMultirotorState(vehicle_name=self.vehicle_name).kinematics_estimated.linear_velocity
+        self.drone.moveByVelocityAsync(
+            quad_vel.x_val + quad_offset[0],
+            quad_vel.y_val + quad_offset[1],
+            quad_vel.z_val + quad_offset[2],
             1,
             vehicle_name=self.vehicle_name
         ).join()
+        # quad_pos = self.drone.getMultirotorState(vehicle_name=self.vehicle_name).kinematics_estimated.position
+        # self.drone.moveToPositionAsync(
+        #     quad_pos.x_val + quad_offset[0],
+        #     quad_pos.y_val + quad_offset[1],
+        #     -3,
+        #     1,
+        #     vehicle_name=self.vehicle_name
+        # ).join()
 
     def _compute_reward(self):
         dist = 75

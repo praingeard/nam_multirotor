@@ -29,8 +29,8 @@ def thrust_to_pwm(thrust):
 	return pwm
 
 def moments_to_pwm(Mx,My,T):
-	Mx = Mx/10
-	My = My/10
+	Mx = Mx/100
+	My = My/100
 	k = 0.0000155
 	l = 0.2275
 	w1sq = (T/(4*k)) + (Mx/(4*k*l)) + (My/(4*k*l)) 
@@ -53,7 +53,7 @@ leader_names = ["Leader"]
 g = 9.81
 timestep_max = 300.0
 timestep_rate = 0.1
-L_matrix = [[3, -1, -1, -1],[-1, 3, -1, -1],[-1, -1, 3, -1],[0, 0, 0, 0]]
+L_matrix = [[3, -1, -1, 0],[-1, 3, -1, -1],[-1, -1, 3, 0],[0, 0, 0, 0]]
 A_matrix = [[0, 1, 1, 0],[1, 0, 1, 1],[1, 1, 0, 0],[0, 0, 0, 0]]
 #state in x,y is [x,y, u, v, g*theta, g*phi, gq, gp]
 drone_init_state_xy = [[0, 0, 0, 0, -1, 0, 0, 0], [2, 0, 0, 0, 0, 0, 0, 0],[0, 0, 0, 0, 1, 0, 0, 0],[4, 0, 0, 0, 0, 0, 0, 0]]
@@ -84,7 +84,7 @@ print("relative states", relative_state_xy)
 print("relative states z", relative_state_z)
 
 #setup gains 
-beta_gains = [-2, -1, 0.3, 0]
+beta_gains = [-1, -5, 15, 3]
 gamma_gains = [2.9, 3.9]
 
 #setup useful functions 

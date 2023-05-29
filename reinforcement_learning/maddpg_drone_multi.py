@@ -15,8 +15,8 @@ def parse_args():
     parser = argparse.ArgumentParser("Reinforcement Learning experiments for multiagent environments")
     # Environment
     parser.add_argument("--scenario", type=str, default="simple", help="name of the scenario script")
-    parser.add_argument("--max-episode-len", type=int, default=25, help="maximum episode length")
-    parser.add_argument("--num-episodes", type=int, default=200, help="number of episodes")
+    parser.add_argument("--max-episode-len", type=int, default=40, help="maximum episode length")
+    parser.add_argument("--num-episodes", type=int, default=300, help="number of episodes")
     parser.add_argument("--num-adversaries", type=int, default=0, help="number of adversaries")
     parser.add_argument("--good-policy", type=str, default="maddpg", help="policy for good agents")
     parser.add_argument("--adv-policy", type=str, default="maddpg", help="policy of adversaries")
@@ -29,6 +29,7 @@ def parse_args():
     parser.add_argument("--exp-name", type=str, default="maddpg", help="name of the experiment")
     parser.add_argument("--save-dir", type=str, default="./tmp/policy/", help="directory in which training state and model should be saved")
     parser.add_argument("--save-rate", type=int, default=1, help="save model once every time this many episodes are completed")
+    parser.add_argument("--save-rewards", type=int, default=3, help="save graphs with rewards every time this number of episodes is completed")
     parser.add_argument("--load-dir", type=str, default="", help="directory in which training state and model are loaded")
     # Evaluation
     parser.add_argument("--restore", action="store_true", default=False)
@@ -53,7 +54,7 @@ def make_env(scenario_name, arglist, benchmark=False):
     env = gym.make(
                 "airgym:airsim-drone-leader-v3",
                 ip_address="127.0.0.1",
-                step_length=1.0,
+                step_length=0.7,
                 image_shape=(84, 84, 1),
             )
     env.n = 4
@@ -181,15 +182,27 @@ def train(arglist):
                 final_ep_steps.append(last_episode_steps)
 
             # saves final episode reward for plotting training curve later
-            if len(episode_rewards) > arglist.num_episodes:
+            if len(episode_rewards) % arglist.save_rewards == 0:
                 rew_file_name = arglist.plots_dir + arglist.exp_name + '_rewards.pkl'
-                with open(rew_file_name, 'wb') as fp:
+                with open(rew_file_name, 'w+b') as fp:
                     pickle.dump(final_ep_rewards, fp)
                 agrew_file_name = arglist.plots_dir + arglist.exp_name + '_agrewards.pkl'
-                with open(agrew_file_name, 'wb') as fp:
+                with open(agrew_file_name, 'w+b') as fp:
                     pickle.dump(final_ep_ag_rewards, fp)
                 len_file_name = arglist.plots_dir + arglist.exp_name + '_len.pkl'
-                with open(len_file_name, 'wb') as fp:
+                with open(len_file_name, 'w+b') as fp:
+                    pickle.dump(final_ep_steps, fp)
+
+            # saves final episode reward for plotting training curve later
+            if len(episode_rewards) > 4*arglist.num_episodes:
+                rew_file_name = arglist.plots_dir + arglist.exp_name + '_rewards.pkl'
+                with open(rew_file_name, 'w+b') as fp:
+                    pickle.dump(final_ep_rewards, fp)
+                agrew_file_name = arglist.plots_dir + arglist.exp_name + '_agrewards.pkl'
+                with open(agrew_file_name, 'w+b') as fp:
+                    pickle.dump(final_ep_ag_rewards, fp)
+                len_file_name = arglist.plots_dir + arglist.exp_name + '_len.pkl'
+                with open(len_file_name, 'w+b') as fp:
                     pickle.dump(final_ep_steps, fp)
                 print('...Finished total of {} episodes.'.format(len(episode_rewards)))
                 break
