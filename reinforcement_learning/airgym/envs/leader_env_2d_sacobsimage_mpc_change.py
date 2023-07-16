@@ -13,6 +13,7 @@ import os
 import datetime
 from typing import Dict, Any
 import math
+import matplotlib.pyplot as plt
 
 STOP_SIGNAL = signal.SIGABRT
 START_SIGNAL = signal.SIGFPE
@@ -39,6 +40,11 @@ class AirSimLeader2DEnv(AirSimEnv):
         self.drone_names = ["Leader"]
         self.drone = airsim.MultirotorClient(ip=ip_address)
         self.drone_names = ["Drone1", "Drone2", "Drone3", "Leader"]
+        self.delta_list = [0.0]
+        self.t_list = [0]
+        self.success = 0
+        self.failure = 0
+        self.success_rate = 0 
         
         # Set detection radius in [cm]
         self.drone.simSetDetectionFilterRadius(AirSimLeader2DEnv.camera_name,  AirSimLeader2DEnv.image_type, 100 * 200)
@@ -121,6 +127,8 @@ class AirSimLeader2DEnv(AirSimEnv):
     def _setup_flight(self):
         #also need to start MPC
         self.drone.reset()
+        self.delta_list = [0.0]
+        self.t_list = [0]
         for drone in self.drone_names:
             self.drone.enableApiControl(True, vehicle_name=drone)
             self.drone.armDisarm(True, vehicle_name=drone)
@@ -213,10 +221,27 @@ class AirSimLeader2DEnv(AirSimEnv):
             1,
             vehicle_name=self.vehicle_name
         ).join()
+        
+    def get_energy(self):
+        energy = 0
+        try:
+            self.config.read('config.ini')
+            energy = float(self.config['DEFAULT']['energy'])
+            energy_checked = True
+            self.config['DEFAULT']['energy_checked'] = str(energy_checked)
+
+            with open('config.ini', 'w') as configfile:
+                self.config.write(configfile)
+  
+        except KeyError as e:
+            print(e)
+        
+        return energy, energy_checked
 
     def _compute_reward(self):
         dist = 75
         self.time = self.time + 1
+        self.t_list.append(self.time)
         done = False
         collision = False
         goal_reached = False
@@ -236,27 +261,43 @@ class AirSimLeader2DEnv(AirSimEnv):
         if self.state["collision"]:
             reward = -1000
             collision = True
+            self.failure = self.failure + 1
         else:
+            energy, energy_checked = self.get_energy()
+            print(energy)
             old_dist = np.sqrt((old_quad_pt[0]-pt[0])**2 + (old_quad_pt[1]-pt[1])**2)
             quad_dist = np.abs(dist - old_dist)
             if self.time > 30:
                 collision = True
                 reward = -1000
-            elif dist < 20:
+                self.failure = self.failure + 1
+            elif dist < 15:
                 reward = 1000
+                self.success = self.success + 1
                 goal_reached = True
+                plt.plot(self.t_list,self.delta_list)
+                print(self.delta_list)
+                plt.xlabel('t (step)')
+                plt.ylabel('delta')
+                #plt.savefig('deltaevol2')
             elif dist<=self.dist:
-                reward = (5+(5*quad_dist)) + (pt[0]-dist) - delta*0.1
+                reward = (5+(5*quad_dist)) + (pt[0]-dist) #- delta*0.1
             else:
-                reward =-(5+ 5*quad_dist) + (pt[0]-dist) -delta*0.1
+                reward =-(5+ 5*quad_dist) + (pt[0]-dist) #-delta*0.1
+            # elif dist<=self.dist:
+            #     reward = (5+(5*quad_dist)) + (pt[0]-dist) - delta*0.1 - energy*0.05
+            # else:
+            #     reward =-(5+ 5*quad_dist) + (pt[0]-dist) -delta*0.1 - energy*0.05
         self.dist = dist
         if goal_reached or collision:
             print("env reset")
             done = True
+            self.success_rate = self.success/(self.success + self.failure)
+            trials = self.success + self.failure
+            print(self.success_rate, trials)
             self.reset()
         reward = int(reward)
         print(reward, dist)
-
         return reward, done
 
     def step(self, action):
@@ -292,6 +333,7 @@ class AirSimLeader2DEnv(AirSimEnv):
     def interpret_action(self, action):
         quad_offset = (action[0], action[1], 0)
         delta = action[2]
+        self.delta_list.append(delta)
         self.config['DEFAULT']['delta'] = str(delta)
         with open('config.ini', 'w') as configfile:
             self.config.write(configfile)

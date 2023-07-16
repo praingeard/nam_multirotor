@@ -31,6 +31,9 @@ class AirSimLeader2DEnv(AirSimEnv):
         self.drone_names = ["Leader"]
         self.drone = airsim.MultirotorClient(ip=ip_address)
         self.drone_names = ["Drone1", "Drone2", "Drone3", "Leader"]
+        self.success = 0
+        self.failure = 0
+        self.success_rate = 0
         
         # Set detection radius in [cm]
         self.drone.simSetDetectionFilterRadius(AirSimLeader2DEnv.camera_name,  AirSimLeader2DEnv.image_type, 100 * 200)
@@ -207,6 +210,7 @@ class AirSimLeader2DEnv(AirSimEnv):
         dist = np.sqrt((quad_pt[0]-pt[0])**2 + (quad_pt[1]-pt[1])**2)
         if self.state["collision"]:
             reward = -1000
+            self.failure += 1
             collision = True
         else:
             old_dist = np.sqrt((old_quad_pt[0]-pt[0])**2 + (old_quad_pt[1]-pt[1])**2)
@@ -215,6 +219,7 @@ class AirSimLeader2DEnv(AirSimEnv):
             quad_dist = np.abs(dist - old_dist)
             if dist < 20:
                 reward = 1000
+                self.success += 1
                 goal_reached = True
             elif dist<=self.dist:
                 reward = (5+(5*quad_dist)) + (pt[0]-dist) 
@@ -223,6 +228,8 @@ class AirSimLeader2DEnv(AirSimEnv):
         self.dist = dist
         if goal_reached or collision:
             print("env reset")
+            self.success_rate = self.success/(self.success + self.failure)
+            print()
             done = True
             self.reset()
         reward = int(reward)

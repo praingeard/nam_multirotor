@@ -29,6 +29,9 @@ class AirSimLeader2DEnv(AirSimEnv):
         self.image_shape = image_shape
         self.dist = 75
         self.vehicle_name = drone_name
+        self.success = 0
+        self.failure = 0
+        self.success_rate = 0
         self.drone_names = [drone_name]
         self.drone = airsim.MultirotorClient(ip=ip_address)
         #self.drone_names = ["Drone1", "Drone2", "Drone3", "Leader"]
@@ -69,11 +72,12 @@ class AirSimLeader2DEnv(AirSimEnv):
 
     def _setup_flight(self):
         #also need to start MPC
-        pose = Pose(position_val=Vector3r(0.0,0.0,0.0))
-        self.drone.simSetVehiclePose(pose, ignore_collision=True, vehicle_name=self.vehicle_name)
         for drone in self.drone_names:
             self.drone.enableApiControl(True, vehicle_name=drone)
             self.drone.armDisarm(True, vehicle_name=drone)
+        pose = Pose(position_val=Vector3r(0.0,0.0,0.0))
+        self.drone.simSetVehiclePose(pose, ignore_collision=True, vehicle_name=self.vehicle_name)
+        
 
         # Set home position and velocity
         self.drone.moveByVelocityAsync(0, 0, 1, 3, vehicle_name=self.vehicle_name).join()
@@ -149,12 +153,14 @@ class AirSimLeader2DEnv(AirSimEnv):
         dist = np.sqrt((quad_pt[0]-pt[0])**2 + (quad_pt[1]-pt[1])**2)
         if self.state["collision"]:
             reward = -1000
+            self.failure +=1
             collision = True
         else:
             old_dist = np.sqrt((old_quad_pt[0]-pt[0])**2 + (old_quad_pt[1]-pt[1])**2)
             quad_dist = np.abs(dist - old_dist)
-            if dist < 20:
+            if dist < 15:
                 reward = 1000
+                self.success += 1
                 goal_reached = True
             elif dist<=self.dist:
                 reward = (5+(5*quad_dist)) + (pt[0]-dist) 
@@ -162,8 +168,11 @@ class AirSimLeader2DEnv(AirSimEnv):
                 reward =-(5+ 5*quad_dist) + (pt[0]-dist)
         self.dist = dist
         if goal_reached or collision:
+            self.success_rate = self.success/(self.success + self.failure)
+            trials = self.success + self.failure
             print("env reset")
             done = True
+            print("success rate for drone " + self.drone_names[0], self.success_rate, trials)
             self.reset()
         reward = int(reward)
         print(reward, dist)
